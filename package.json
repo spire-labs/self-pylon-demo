@@ -1,0 +1,23 @@
+{
+  "name": "self-pylon-demo",
+  "private": true,
+  "packageManager": "pnpm@9.1.0",
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "contracts",
+    "packages/*"
+  ],
+  "dependencies": {
+    "@openzeppelin/contracts": "5",
+    "@self-pylon-demo/abis": "workspace:*",
+    "@self-pylon-demo/addresses": "workspace:*",
+    "@self-pylon-demo/self-adapter": "workspace:*",
+    "@selfxyz/contracts": "^1.2.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter ./apps/** run build",
+    "dev": "pnpm -r --filter ./apps/** run dev",
+    "lint": "pnpm -r --filter ./apps/** run lint"
+  }
+}

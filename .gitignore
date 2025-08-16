@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Foundry
+cache/
+out/
+lib/
+broadcast/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env*
+.secrets/
+
+# OS
+.DS_Store
+Thumbs.db
+
