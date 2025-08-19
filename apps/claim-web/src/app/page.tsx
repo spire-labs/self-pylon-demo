@@ -1,49 +1,40 @@
 "use client";
-import { useAccount, useConnect, useDisconnect, usePublicClient, useWriteContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { useEffect, useState } from 'react';
-import { createPublicClient, http } from 'viem';
-import { SelfAttestationRegistryABI, HumanNFTABI, ProofOfHumanABI } from '@self-pylon-demo/abis';
-import { getAddress as getBookAddress } from '@self-pylon-demo/addresses';
+import { useState } from 'react';
+import { HumanNFTABI } from '@self-pylon-demo/abis';
 import Status from '../components/Status';
 
 export default function Page() {
   const { isConnected, address } = useAccount();
   const { connect, isPending: isConnectPending } = useConnect();
   const { disconnect } = useDisconnect();
-  const [attested, setAttested] = useState(false);
   const [mintStatus, setMintStatus] = useState('');
-  const publicClient = usePublicClient();
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
-  useEffect(() => {
-    // Optionally auto-check on connect
-    (async () => {
-      if (!address) return;
-      const celoClient = createPublicClient({
-        transport: http(process.env.NEXT_PUBLIC_CELO_L2_RPC_URL || ''),
-        chain: {
-          id: Number(process.env.NEXT_PUBLIC_CELO_L2_CHAIN_ID || 0),
-          name: 'Celo L2',
-          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-          rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_CELO_L2_RPC_URL || ''] } }
-        }
-      });
-      try {
-        const hubRootAddr = (process.env.NEXT_PUBLIC_HUB_ROOT_ADDRESS ||
-          '0x0000000000000000000000000000000000000000') as `0x${string}`;
-        const verified = await celoClient.readContract({
-          address: hubRootAddr,
-          abi: ProofOfHumanABI,
-          functionName: 'verifiedHumans',
-          args: [address]
-        });
-        setAttested(Boolean(verified));
-      } catch (e) {
-        setAttested(false);
+  const handleMint = async () => {
+    if (!address) return;
+    
+    try {
+      const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
+      if (!nftAddr || nftAddr === '0x0000000000000000000000000000000000000000') {
+        setMintStatus('Error: HumanNFT contract address not configured');
+        return;
       }
-    })();
-  }, [address]);
+      
+      setMintStatus('Minting...');
+      const tx = await writeContractAsync({
+        address: nftAddr,
+        abi: HumanNFTABI,
+        functionName: 'mint',
+        args: []
+      });
+      setMintStatus(`Submitted: ${tx}`);
+    } catch (e: any) {
+      console.error('Mint error:', e);
+      setMintStatus(e?.message || 'Mint failed');
+    }
+  };
 
   return (
     <main style={{ padding: 24, display: 'grid', gap: 16 }}>
@@ -61,37 +52,23 @@ export default function Page() {
       )}
 
       <section style={{ display: 'grid', gap: 8 }}>
-        <h2>Verify attestation on Celo</h2>
-        <div>Status: {attested ? 'Attested' : 'Not attested'}</div>
-        <Status label="Registry" value={(process.env.NEXT_PUBLIC_SELF_REGISTRY_ADDRESS as string) || ''} />
+        <h2>Claim Your Human NFT</h2>
+        <p style={{ color: '#666', fontSize: 14 }}>
+          This NFT can only be claimed by verified humans. The contract will automatically verify your attestation status 
+          on Celo L2 and check for any duplicate claims. No need to worry about the verification details - just click mint!
+        </p>
+        <Status label="HumanNFT Contract" value={process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS || 'Not set'} />
+        <Status label="Pylon RPC" value={process.env.NEXT_PUBLIC_PYLON_RPC_URL || 'Not set'} />
+        <Status label="Pylon Chain ID" value={process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 'Not set'} />
       </section>
 
       <section>
         <button
-          disabled={!attested || isWritePending}
-          onClick={async () => {
-            if (!address) return;
-            try {
-              const nftAddr = (
-                process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS ||
-                getBookAddress('pylon', 'humanNft') ||
-                '0x0000000000000000000000000000000000000000'
-              ) as `0x${string}`;
-              setMintStatus('Minting...');
-              const tx = await writeContractAsync({
-                address: nftAddr,
-                abi: HumanNFTABI,
-                functionName: 'mint',
-                args: []
-              });
-              setMintStatus(`Submitted: ${tx}`);
-            } catch (e: any) {
-              setMintStatus(e?.message || 'Mint failed');
-            }
-          }}
+          disabled={!isConnected || isWritePending}
+          onClick={handleMint}
           style={{ padding: 12 }}
         >
-          Mint NFT
+          Mint Human NFT
         </button>
         <div style={{ fontSize: 12, color: '#666' }}>{mintStatus}</div>
       </section>

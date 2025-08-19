@@ -1,44 +1,118 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// Minimal ERC165
-interface IERC165 {
-    function supportsInterface(bytes4 interfaceId) external view returns (bool);
+import "@openzeppelin/token/ERC721/ERC721.sol";
+import "@openzeppelin/access/Ownable.sol";
+
+// Interface for ProofOfHuman contract on Celo L2
+interface IProofOfHuman {
+    function isVerified(address user) external view returns (bool);
+    function addressToNullifier(address user) external view returns (uint256);
 }
 
-// Minimal ERC721 interface
-interface IERC721 is IERC165 {
-    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
-    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
-
-    function balanceOf(address owner) external view returns (uint256 balance);
-    function ownerOf(uint256 tokenId) external view returns (address owner);
-    function getApproved(uint256 tokenId) external view returns (address operator);
-    function isApprovedForAll(address owner, address operator) external view returns (bool);
-    function approve(address to, uint256 tokenId) external;
-    function setApprovalForAll(address operator, bool approved) external;
-    function transferFrom(address from, address to, uint256 tokenId) external;
-    function safeTransferFrom(address from, address to, uint256 tokenId) external;
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) external;
-}
-
-contract HumanNFT is IERC721 {
-    string public constant name = "I Am Human";
-    string public constant symbol = "HUMAN";
-
+contract HumanNFT is ERC721, Ownable {
     uint256 public nextId = 1;
-    mapping(address => bool) public minted;
-    mapping(uint256 => address) private _ownerOf;
-    mapping(address => uint256) private _balanceOf;
-    mapping(uint256 => address) private _approvals;
-    mapping(address => mapping(address => bool)) private _operatorApproval;
+    mapping(uint256 => bool) public nullifierMinted; // Track which nullifiers have been used
+    
+    // ProofOfHuman contract address on Celo L2
+    address public proofOfHumanContract;
+    
+    // Events
+    event ProofOfHumanContractUpdated(address indexed oldContract, address indexed newContract);
+    event HumanVerified(address indexed user, uint256 indexed tokenId, uint256 nullifier);
 
-    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-        return interfaceId == 0x80ac58cd /* ERC721 */ || interfaceId == 0x01ffc9a7 /* ERC165 */;
+    constructor(address _proofOfHumanContract) ERC721("I Am Human", "HUMAN") Ownable(msg.sender) {
+        require(_proofOfHumanContract != address(0), "Invalid ProofOfHuman contract address");
+        proofOfHumanContract = _proofOfHumanContract;
     }
-
-    // Small on-chain SVG. Replace with your own art; keep it short to limit gas.
+    
+    // Public view function to check if a nullifier has been used
+    function isNullifierMinted(uint256 nullifier) public view returns (bool) {
+        return nullifierMinted[nullifier];
+    }
+    
+    function setProofOfHumanContract(address _proofOfHumanContract) external onlyOwner {
+        require(_proofOfHumanContract != address(0), "Invalid contract address");
+        address oldContract = proofOfHumanContract;
+        proofOfHumanContract = _proofOfHumanContract;
+        emit ProofOfHumanContractUpdated(oldContract, _proofOfHumanContract);
+    }
+    
+    function _getNullifier(address user) internal view returns (uint256) {
+        require(proofOfHumanContract != address(0), "ProofOfHuman contract not set");
+        
+        try IProofOfHuman(proofOfHumanContract).addressToNullifier(user) returns (uint256 nullifier) {
+            return nullifier;
+        } catch {
+            // If the call fails, return 0 (no nullifier found)
+            return 0;
+        }
+    }
+    
+    // Public view function to get nullifier for an address
+    function getNullifierForAddress(address user) external view returns (uint256) {
+        return _getNullifier(user);
+    }
+    
+    // Override transfer functions to make NFT soulbound (non-transferable)
+    function transferFrom(address from, address to, uint256 tokenId) public virtual override {
+        revert("Soulbound: This NFT cannot be transferred");
+    }
+    
+    // Override approval functions since transfers are disabled
+    function approve(address to, uint256 tokenId) public virtual override {
+        revert("Soulbound: This NFT cannot be transferred");
+    }
+    
+    function setApprovalForAll(address operator, bool approved) public virtual override {
+        revert("Soulbound: This NFT cannot be transferred");
+    }
+    
+    function getApproved(uint256 tokenId) public view virtual override returns (address) {
+        revert("Soulbound: This NFT cannot be transferred");
+    }
+    
+    function isApprovedForAll(address owner, address operator) public view virtual override returns (bool) {
+        return false;
+    }
+    
+    function mint() external {
+        // Get the nullifier for this address from ProofOfHuman contract
+        uint256 nullifier = _getNullifier(msg.sender);
+        
+        // Check if they have a nullifier (are attested)
+        require(nullifier != 0, "BEEP BOOP! The ProofOfHuman contract says you're not verified. Are you sure you're not a sophisticated AI trying to infiltrate our human club? Maybe try getting a real passport first?");
+        
+        // Check if this nullifier has already been used to mint an NFT
+        require(!isNullifierMinted(nullifier), "Nice try, robot! This passport has already been used to claim an NFT. Are you trying to create multiple identities? That's very... robot-like behavior! Maybe try cloning yourself and getting another passport first?");
+        
+        // All checks passed - mint the NFT
+        nullifierMinted[nullifier] = true;
+        uint256 tokenId = nextId++;
+        _mint(msg.sender, tokenId);
+        
+        emit HumanVerified(msg.sender, tokenId, nullifier);
+    }
+    
+    // Override tokenURI to provide custom metadata
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        require(ownerOf(tokenId) != address(0), "ERC721: invalid token ID");
+        
+        // Small on-chain SVG. Replace with your own art; keep it short to limit gas.
+        string memory imageData = _imageData();
+        
+        // Minimal JSON with image inlined as data URI
+        return string(
+            abi.encodePacked(
+                'data:application/json,{',
+                '\n  "name": "I Am Human",',
+                '\n  "description": "Attested human on Self+Celo",',
+                '\n  "image": "', imageData, '"',
+                '\n}'
+            )
+        );
+    }
+    
     function _imageData() private pure returns (string memory) {
         return
             'data:image/svg+xml;utf8,'
@@ -48,69 +122,6 @@ contract HumanNFT is IERC721 {
             '<rect x="196" y="250" width="120" height="160" rx="28" fill="#00E08B"/>'
             '<text x="256" y="460" font-family="monospace" font-size="28" text-anchor="middle" fill="#FFFFFF">I AM HUMAN</text>'
             '</svg>';
-    }
-
-    function tokenURI(uint256) public pure returns (string memory) {
-        // Minimal JSON with image inlined as data URI
-        return string(
-            abi.encodePacked(
-                'data:application/json,{',
-                '\n  "name": "I Am Human",',
-                '\n  "description": "Attested human on Self+Celo",',
-                '\n  "image": "', _imageData(), '"',
-                '\n}'
-            )
-        );
-    }
-
-    function balanceOf(address owner) external view override returns (uint256) {
-        require(owner != address(0), "zero address");
-        return _balanceOf[owner];
-    }
-
-    function ownerOf(uint256 tokenId) public view override returns (address) {
-        address owner = _ownerOf[tokenId];
-        require(owner != address(0), "not minted");
-        return owner;
-    }
-
-    function getApproved(uint256 tokenId) external view override returns (address) {
-        require(_ownerOf[tokenId] != address(0), "not minted");
-        return _approvals[tokenId];
-    }
-
-    function isApprovedForAll(address owner, address operator) external view override returns (bool) {
-        return _operatorApproval[owner][operator];
-    }
-
-    // Soulbound: disallow approvals/transfers to keep minimal
-    function approve(address, uint256) external override {
-        revert("soulbound");
-    }
-
-    function setApprovalForAll(address, bool) external override {
-        revert("soulbound");
-    }
-
-    function transferFrom(address, address, uint256) external override {
-        revert("soulbound");
-    }
-
-    function safeTransferFrom(address, address, uint256) external override {
-        revert("soulbound");
-    }
-
-    function safeTransferFrom(address, address, uint256, bytes calldata) external override {
-        revert("soulbound");
-    }
-
-    function mint() external {
-        require(!minted[msg.sender], "already minted");
-        minted[msg.sender] = true;
-        uint256 tokenId = nextId++;
-        _ownerOf[tokenId] = msg.sender;
-        _balanceOf[msg.sender] += 1;
-        emit Transfer(address(0), msg.sender, tokenId);
     }
 }
 

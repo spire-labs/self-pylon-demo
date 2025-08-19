@@ -2,73 +2,115 @@
 
 A fully on-chain, privacy-preserving identity attestation system using the Self protocol and Pylon appchain.
 
+### Test the Complete Flow
+
+1. **Connect Wallet**: Connect your wallet to get your address
+2. **Generate Signature**: Sign a message to prove address ownership
+3. **Scan QR Code**: Use Self app to scan passport and generate proof of passport
+4. **Automatic Submission**: Self automatically submits proof to ProofOfHuman contract on Celo's L2
+5. **ProofOfHuman**: Binds your public wallet address to your passport without revealing passport details
+6. **Claim NFT**: Visit claim-web which runs on its own Pylon appchain and attempt to mint the "I am human" NFT which will execute a synchronous cross-chain call to the ProofOfHuman contract on Celo's L2 to verify and approve the mint request
+
 ## Architecture
 
-This system enables users to:
-1. **Generate zero-knowledge proofs** for identity attributes using the Self mobile app
-2. **Submit proofs on-chain** to Celo L2 via a frontend-initiated, wallet-signed transaction
-3. **Claim "I am human" NFTs** on Pylon's appchain based on verified attestations
-4. **Maintain privacy** - only cryptographic commitments and ZK proofs are stored on-chain
+This system enables:
+1. **Users to Maintain privacy** - only cryptographic commitments and ZK proofs are stored on-chain
+2. **App devs to defend against sybil attacks** - NFTs can only be claimed once per passport
+3. **Celo to act as a user identity hub** - Celo's network effects expand their reach making it a more attractive deployment target
 
 ```mermaid
 graph TD
-    A[User scans QR code] --> B[Self app generates ZKP]
-    B --> C[Frontend receives proof]
-    C --> D[User signs transaction]
-    D --> E[Proof verified on Celo L2]
-    E --> F[Attestation stored on-chain]
-    F --> G[Pylon appchain reads attestation]
-    G --> H[User claims "I am human" NFT]
+    U[User]:::userLayer
+    AW[attest-web]:::serviceLayer
+    CW[claim-web]:::serviceLayer
+    SA[Self Mobile App]:::externalLayer
+    SH[Self Hub Contract]:::contractLayer
+    PH[ProofOfHuman Contract]:::contractLayer
+    HN[HumanNFT Contract]:::contractLayer
     
-    I[Self Hub Contract] --> E
-    J[ProofOfHuman Contract] --> F
-    K[HumanNFT Contract] --> H
+    U -->|1- Connect & Sign| AW
+    AW -->|2- Display QR| AW
+    U -->|3- Scan QR| SA
+    SA -->|4- Submit Proof| SH
+    SH -->|5- Verify ZKP| PH
+    PH -->|6- Store Attestation| PH
+    U -->|7- Initiate Claim| CW
+    CW -->|8- Mint Request| HN
+    HN -->|9- Verify Attestation| PH
+    HN -->|10- Mint NFT| HN
+    
+    %% Styling
+    classDef userLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#0d47a1
+    classDef serviceLayer fill:#fff8e1,stroke:#f57f17,stroke-width:2px,color:#e65100
+    classDef externalLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
+    classDef contractLayer fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+    classDef blockchainLayer fill:#fff8e1,stroke:#f57f17,stroke-width:2px,color:#e65100
 ```
 
-### Component Interactions
+## 0. Using Existing Deployment
 
-1. **QR Code Generation**: Frontend creates Self app QR code with specific scope and disclosures
-2. **Proof Generation**: Self mobile app scans passport/ID and generates zero-knowledge proof
-3. **Proof Submission**: Frontend receives proof and prompts user to submit on-chain transaction
-4. **On-chain Verification**: Self Hub contract verifies the ZK proof meets requirements
-5. **Attestation Storage**: ProofOfHuman contract stores verified human status
-6. **Cross-chain Read**: Pylon appchain reads attestation data from Celo L2
-7. **NFT Minting**: User claims "I am human" NFT with verified attestation
+### Quick Start with Pre-deployed Contracts
 
-## Quick Start (Deploy-First Approach)
-
-### 0. Using Existing Deployment (Optional)
-If you want to use our existing deployment instead of deploying your own contracts, you can skip the deployment steps and use these pre-configured values:
+If you want to use our existing deployment instead of deploying your own contracts:
 
 ```bash
-# Core configuration
+# Install dependencies
+pnpm install
+
+# Set environment variables for existing deployment
 export SELF_HUB_ADDRESS=0xe57F4773bd9c9d8b6Cd70431117d353298B9f5BF
 export SELF_CONFIG_ID=0x7baf7f25b3fe0f6eacb06d67e319140996ad4dd54f00529abf3fea5095f06b72
-export SELF_SCOPE=14512460194057449064845631405870909134609057302642515550058931165412051128987
+export SELF_SCOPE=18357982425819932074273780827128310208012362272222002103953286134929761147025
 export NEXT_PUBLIC_SELF_SCOPE="self-pylon-demo"
-
-# Network configuration
 export CELO_L2_RPC_URL=https://forno.celo.org
 export CELO_L2_CHAIN_ID=42220
 export PYLON_RPC_URL=https://pylon.celo-mainnet.spire.dev
 export PYLON_CHAIN_ID=2139
+export PROOF_OF_HUMAN_ADDRESS=0x5E05a5CCf9fe3EC0a4b602A56381D685D0f711a8
+export HUMAN_NFT_ADDRESS=0x0000000000000000000000000000000000000000
 
-# Contract addresses (running for the first time you can get these from deployment files)
-export PROOF_OF_HUMAN_ADDRESS=0x5234cc99A4197525b8550E17d02b25F0D00D10B9
+# Configure frontend
+cat > apps/attest-web/.env.local << EOF
+NEXT_PUBLIC_CELO_L2_RPC_URL=$CELO_L2_RPC_URL
+NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS=$PROOF_OF_HUMAN_ADDRESS
+NEXT_PUBLIC_SELF_SCOPE=$NEXT_PUBLIC_SELF_SCOPE
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+EOF
 
-# @todo need to deploy
-latest_pylon=$(find contracts/broadcast/DeployPylon.s.sol/2139 -name "run-latest.json" -type f)
-export HUMAN_NFT_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="HumanNFT") | .contractAddress' "$latest_pylon")
+cat > apps/claim-web/.env.local << EOF
+NEXT_PUBLIC_PYLON_RPC_URL=$PYLON_RPC_URL
+NEXT_PUBLIC_PYLON_CHAIN_ID=$PYLON_CHAIN_ID
+NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+EOF
+
+# Start both apps simultaneously
+pnpm --parallel --filter attest-web --filter claim-web dev
 ```
 
-**Note:** The existing deployment already has the scope and configId configured on the ProofOfHuman contract so those steps can be skipped if using the existing deployment as well.
 
-### 1. Install Dependencies
+## 1. Deploying the Project
+
+### Prerequisites
+
 ```bash
+# Install dependencies
 pnpm install
+
+# Generate deployer private key
+export SIGNER_PRIVATE_KEY=$(cast wallet new | grep "Private key:" | cut -d: -f2 | tr -d ' ')
+
+# Get the public address from the private key
+export SIGNER_ADDRESS=$(cast wallet address --private-key $SIGNER_PRIVATE_KEY)
+
+echo "Private key: $SIGNER_PRIVATE_KEY"
+echo "Address: $SIGNER_ADDRESS"
+
+# Ensure account has funds for deployment gas fees
 ```
 
-### 2. Set RPC Environment Variables
+### Network Configuration
+
 ```bash
 # Celo mainnet
 export CELO_L2_RPC_URL="https://forno.celo.org"
@@ -78,43 +120,52 @@ export CELO_L2_CHAIN_ID=42220
 export PYLON_RPC_URL="https://pylon.celo-mainnet.spire.dev"
 export PYLON_CHAIN_ID=2139
 
-# Self Hub contract address (this is the official Self contract)
+# Self Hub contract (official Self contract)
 export SELF_HUB_ADDRESS=0xe57F4773bd9c9d8b6Cd70431117d353298B9f5BF
 ```
 
-### 3. Generate Self Configuration
-You need to use the Self web tool to generate your verification configuration and scope. This cannot be done via CLI.
+## 2. ProofOfHuman Setup
 
-**Steps:**
+### 2a. Using Existing Deployment
+
+Skip to section 3 if using our existing ProofOfHuman contract.
+
+### 2b. Deploying ProofOfHuman for First Time
+
+#### Generate Self Configuration
+
 1. Visit [Self's configuration interface](https://app.self.xyz/configure)
-2. Set your verification requirements:
+2. Set verification requirements:
    - Minimum age: 18
    - Enable OFAC 1 and OFAC 2 sanctions checks
-   - Submit to get your `configId`
-3. Generate a scope seed (this will be used as `NEXT_PUBLIC_SELF_SCOPE` in your frontend)
-4. Set the actual scope value on your contract (this is the numeric scope, not the seed)
+3. Submit to get your `configId`
+4. Generate a scope seed for frontend
 
-**Important:** The `NEXT_PUBLIC_SELF_SCOPE` environment variable in your frontend should be set to the scope seed (a string like "self-pylon-demo"), while the `scope` parameter you set on your contract should be the numeric scope value returned by the Self tool.
+The Self configuration tool will:
+- Deploy a new configuration if one doesn't exist for your chosen settings
+- Provide you with a `configId` (bytes32) and `scope` (uint256)
+- Allow you to customize verification parameters through the UI
 
-**Example values from our deployment:**
+**Note**: If you prefer to deploy the configuration from the terminal instead of the UI, you can use the CLI instead.
+
 ```bash
-# Config ID from Self web tool
-export SELF_CONFIG_ID=0x7baf7f25b3fe0f6eacb06d67e319140996ad4dd54f00529abf3fea5095f06b72
+# After using the Self configuration tool, set the generated values
+# Replace these with the actual values from your Self configuration
+export SELF_CONFIG_ID=<your_generated_config_id>
+export NEXT_PUBLIC_SELF_SCOPE="<your_scope_seed>"
+export SELF_SCOPE=<your_generated_scope_value>
 
-# Scope seed for frontend (this is what users see in the QR code)
-export NEXT_PUBLIC_SELF_SCOPE="self-pylon-demo"
-
-# Numeric scope for contract (this is what gets set on-chain)
-export SELF_SCOPE=14512460194057449064845631405870909134609057302642515550058931165412051128987
+# Example of what these might look like:
+# export SELF_CONFIG_ID=0x7baf7f25b3fe0f6eacb06d67e319140996ad4dd54f00529abf3fea5095f06b72
+# export NEXT_PUBLIC_SELF_SCOPE="my-custom-demo"
+# export SELF_SCOPE=6477103330237602230352812949141264605456698243037569300666502678848111318328
 ```
 
-### 4. Configure Self Hub Contract On-Chain
-After generating the configuration, you need to set it on Self's Hub contract. You can do this via terminal or through their UI if you have a browser wallet with funds:
+#### Configure Self Hub Contract
 
-**Terminal Method:**
 ```bash
 # Set verification configuration on Self's Hub contract
-cast send 0xe57f4773bd9c9d8b6cd70431117d353298b9f5bf \
+cast send $SELF_HUB_ADDRESS \
 "setVerificationConfigV2((bool,uint256,bool,uint256[4],bool[3]))" \
 "(true,18,false,[0,0,0,0],[true,true,false])" \
 --rpc-url $CELO_L2_RPC_URL \
@@ -128,63 +179,27 @@ cast send 0xe57f4773bd9c9d8b6cd70431117d353298b9f5bf \
 # config.ofacEnabled: [true,true,false] (enable OFAC 1 & 2, disable OFAC 3)
 ```
 
-**UI Method:**
-- Visit Self's configuration interface
-- Set minimum age to 18
-- Enable OFAC 1 and OFAC 2 checks
-- Submit the transaction with your browser wallet
+#### Deploy ProofOfHuman Contract
 
-### 5. Set Up Deployer Account
 ```bash
-# Generate a new private key for deployment
-export SIGNER_PRIVATE_KEY=$(cast wallet new)
+# Deploy the contract (temporarily change to contracts directory)
+pushd contracts
+forge script script/DeployHubRoot.s.sol:DeployHubRoot \
+  --rpc-url $CELO_L2_RPC_URL \
+  --broadcast \
+  --private-key $SIGNER_PRIVATE_KEY
+popd
 
-
-```
-
-### 6. Deploy ProofOfHuman Contract (Hub-Root Pattern)
-
-**⚠️ CRITICAL: Address Casing Matters for Self Scope Calculation**
-
-Self's proof system is case-sensitive for contract addresses. The scope calculation includes the contract address, and if the casing doesn't match between proof generation and verification, you'll get a `ScopeMismatch` error.
-
-**Foundry's `run-latest.json` always provides lowercase addresses, but you need the checksummed version for Self.**
-
-**Note:** If you're using our existing deployment, you can skip this step and use the existing contract address:
-```bash
-export PROOF_OF_HUMAN_ADDRESS=0x5234cc99A4197525b8550E17d02b25F0D00D10B9
-```
-
-If you need to deploy your own contract:
-```bash
-forge script script/DeployHubRoot.s.sol:DeployHubRoot --rpc-url $CELO_L2_RPC_URL --broadcast --verify
-
-
-# 1. Get the lowercase address from Foundry
-latest=$(find contracts/broadcast/DeployHubRoot.s.sol/42220 -name "run-latest.json" -type f)
+# Get the deployed address
+latest=$(find contracts/broadcast/DeployHubRoot.s.sol/$CELO_L2_CHAIN_ID -name "run-latest.json" -type f)
 lowercase_addr=$(jq -r '.transactions[] | select(.contractName=="ProofOfHuman") | .contractAddress' "$latest")
-# 
-# 2. Convert to checksummed address for Self
-# ⚠️ IMPORTANT: Get the checksummed address for Self scope calculation
-# Foundry provides lowercase addresses, but Self needs the exact casing
 export PROOF_OF_HUMAN_ADDRESS=$(cast to-check-sum-address $lowercase_addr)
 echo "ProofOfHuman deployed at: $PROOF_OF_HUMAN_ADDRESS"
 ```
 
-### 7. Set Scope and ConfigId on ProofOfHuman
+#### Set Scope and ConfigId
 
-**Note:** If you're using our existing deployment, these values are already set and you can skip this step. You can verify them:
 ```bash
-# Check current values
-cast call $PROOF_OF_HUMAN_ADDRESS "scope()" --rpc-url $CELO_L2_RPC_URL
-cast call $PROOF_OF_HUMAN_ADDRESS "configId()" --rpc-url $CELO_L2_RPC_URL
-```
-
-If you need to set these values on your own contract:
-```bash
-# Get the configId from the previous transaction
-export SELF_CONFIG_ID="0x..." # Use the configId returned from setVerificationConfigV2
-
 # Set the scope and configId on your ProofOfHuman contract
 cast send $PROOF_OF_HUMAN_ADDRESS \
 "setScope(uint256)" \
@@ -199,32 +214,34 @@ cast send $PROOF_OF_HUMAN_ADDRESS \
 --private-key $SIGNER_PRIVATE_KEY
 ```
 
-### 8. Deploy HumanNFT Contract
+## 3. HumanNFT Setup
 
-**Note:** If you're using our existing deployment, you can skip this step and use the existing contract address:
+### 3a. Using Existing Deployment
+
+Skip to section 4 if using our existing HumanNFT contract.
+
+### 3b. Deploying HumanNFT for First Time
+
 ```bash
-# Get the latest deployment run
-latest=$(find contracts/broadcast/DeployPylon.s.sol/2139 -name "run-latest.json" -type f)
-export HUMAN_NFT_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="HumanNFT") | .contractAddress' "$latest")
-```
+# Deploy HumanNFT contract (temporarily change to contracts directory)
+pushd contracts
+forge script script/DeployPylon.s.sol:DeployPylon \
+  --rpc-url $PYLON_RPC_URL \
+  --broadcast \
+  --private-key $SIGNER_PRIVATE_KEY
+popd
 
-If you need to deploy your own contract:
-```bash
-forge script script/DeployPylon.s.sol:DeployPylon --rpc-url $PYLON_RPC_URL --broadcast --verify
-
-# 1. Get the lowercase address from Foundry
-latest=$(find contracts/broadcast/DeployPylon.s.sol/2139 -name "run-latest.json" -type f)
+# Get the deployed address
+latest=$(find contracts/broadcast/DeployPylon.s.sol/$PYLON_CHAIN_ID -name "run-latest.json" -type f)
 lowercase_addr=$(jq -r '.transactions[] | select(.contractName=="HumanNFT") | .contractAddress' "$latest")
-
-# 2. Convert to checksummed address (for consistency, though not required for scope)
 export HUMAN_NFT_ADDRESS=$(cast to-check-sum-address $lowercase_addr)
 echo "HumanNFT deployed at: $HUMAN_NFT_ADDRESS"
 ```
 
-### 9. Configure Frontend Environment
+## 4. Configure Frontend
+
 ```bash
-# Generate .env.local files from environment variables
-# Note: NEXT_PUBLIC_SELF_SCOPE should be the scope seed (string), not the numeric scope
+# Generate .env.local files
 cat > apps/attest-web/.env.local << EOF
 NEXT_PUBLIC_CELO_L2_RPC_URL=$CELO_L2_RPC_URL
 NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS=$PROOF_OF_HUMAN_ADDRESS
@@ -233,65 +250,89 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
 cat > apps/claim-web/.env.local << EOF
-NEXT_PUBLIC_CELO_L2_RPC_URL=$CELO_L2_RPC_URL
 NEXT_PUBLIC_PYLON_RPC_URL=$PYLON_RPC_URL
-NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS=$PROOF_OF_HUMAN_ADDRESS
+NEXT_PUBLIC_PYLON_CHAIN_ID=$PYLON_CHAIN_ID
 NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
-```
 
-### 10. Build Static Sites
-```bash
+# Build static sites
 pnpm --filter attest-web build
 pnpm --filter claim-web build
 ```
 
-## Local Development
+## 5. Run the Project
 
-### Run Apps Locally
 ```bash
-# Start attest-web
-cd apps/attest-web && pnpm dev
+# Option 1: Start both apps simultaneously using pnpm parallel execution
+pnpm --parallel --filter attest-web --filter claim-web dev
 
-# Start claim-web (in another terminal)
-cd apps/claim-web && pnpm dev
+# Option 2: Start them in separate terminals (recommended for development)
+# Terminal 1: attest-web
+pnpm --filter attest-web dev
+
+# Terminal 2: claim-web  
+pnpm --filter claim-web dev
+
+# Option 3: Use tmux/screen to manage multiple terminals
+# tmux new-session -d -s demo
+# tmux send-keys -t demo:0 "pnpm --filter attest-web dev" Enter
+# tmux split-window -h
+# tmux send-keys -t demo:1 "pnpm --filter claim-web dev" Enter
+# tmux attach-session -t demo
 ```
 
-### Test Complete Flow
-1. **Generate QR Code**: Visit attest-web and scan QR with Self app
-2. **Create Proof**: Use mock passport in Self app to generate ZK proof
-3. **Submit Proof**: Frontend receives proof and prompts for on-chain submission
-4. **Verify Attestation**: Check that `verifiedHumans(address)` returns `true`
-5. **Claim NFT**: Visit claim-web and mint "I am human" NFT
+## Important Notes
+
+### Address Casing for Self Protocol
+
+⚠️ **CRITICAL**: Self's proof system is case-sensitive for contract addresses. Always use checksummed addresses:
+
+```bash
+# ❌ Wrong - lowercase address from Foundry
+export PROOF_OF_HUMAN_ADDRESS=0xf3d2672c6321311e4e7606fb081e59a08c43abad
+
+# ✅ Correct - checksummed address for Self
+export PROOF_OF_HUMAN_ADDRESS=$(cast to-check-sum-address 0xf3d2672c6321311e4e7606fb081e59a08c43abad)
+```
 
 ## Troubleshooting
 
 ### ScopeMismatch Error
 
-If you encounter a `ScopeMismatch` error when submitting proofs, this is almost always caused by **address casing mismatch**:
+**Symptoms**: `ScopeMismatch: scope in header doesn't match scope in proof`
 
-**Symptoms:**
-- Error: `ScopeMismatch: scope in header doesn't match scope in proof`
-- Proof generation works, but contract submission fails
+**Solution**: Ensure you have set the Scope on the ProofOfHuman contract and that the casing matches between the frontend and contract deployment.
 
-**Root Cause:**
-Self's scope calculation is case-sensitive and includes the contract address. If the address casing doesn't match between:
-- **Proof generation** (what Self app uses)
-- **Contract submission** (what your frontend sends)
+### Signature Generation Issues
 
-**Solution:**
-1. **Use checksummed addresses**: Always use `cast to-checksum-address` to get the correct casing
-2. **Check environment variables**: Ensure `NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS` uses the checksummed address
-3. **Verify consistency**: The address in your frontend must exactly match what was used during proof generation
+**Solutions**:
+1. Ensure wallet is connected and address is available
+2. Check wallet permissions for message signing
+3. Verify network connection
+4. Refresh page if wallet state gets stuck
 
-**Example:**
+### Minting Issues
+
+**If minting fails, check**:
+1. **HumanNFT contract deployed**: Ensure `HUMAN_NFT_ADDRESS` is set correctly
+2. **ProofOfHuman contract set**: The address is automatically set during deployment
+3. **Attestation completed**: Complete the attestation process using attest-web first
+4. **Pylon configuration**: Check `NEXT_PUBLIC_PYLON_RPC_URL` and `NEXT_PUBLIC_PYLON_CHAIN_ID`
+
+**Debug Steps**:
 ```bash
-# ❌ Wrong - lowercase address from Foundry
-export PROOF_OF_HUMAN_ADDRESS=0x5234cc99a4197525b8550e17d02b25f0d00d10b9
+# Check environment variables are set
+echo "HumanNFT Address: $NEXT_PUBLIC_HUMAN_NFT_ADDRESS"
+echo "Pylon RPC: $NEXT_PUBLIC_PYLON_RPC_URL"
+echo "Pylon Chain ID: $NEXT_PUBLIC_PYLON_CHAIN_ID"
 
-# ✅ Correct - checksummed address for Self
-export PROOF_OF_HUMAN_ADDRESS=$(cast to-check-sum-address 0x5234cc99a4197525b8550e17d02b25f0d00d10b9)
+# Verify contract exists on Pylon
+cast code $NEXT_PUBLIC_HUMAN_NFT_ADDRESS --rpc-url $NEXT_PUBLIC_PYLON_RPC_URL
 ```
 
-## Technical Details
+**Solutions**:
+1. **Complete attestation first**: Use attest-web to generate and submit proof
+2. **Deploy HumanNFT contract**: Follow section 3b to deploy and configure
+3. **Check Pylon configuration**: Ensure all Pylon environment variables are set
+4. **Verify deployment**: Confirm HumanNFT contract is deployed and accessible on Pylon

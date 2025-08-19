@@ -26,19 +26,19 @@ function Inner({ address }: Props) {
     
     try {
       // Create message to sign
-      const message = `I confirm that both this passport and public address ${userAddress} are owned by me`;
+      const message = `I confirm that both this passport and public address ${userAddress.toLowerCase()} are owned by me`;
       console.log('[SelfQR] Message to sign:', message);
       
-      // Prompt user to sign with their wallet
+      // Use personal_sign to generate EIP-191 signature
       const signature = await signMessageAsync({ message });
       
-      console.log('[SelfQR] Signature generated:', signature);
+      console.log('[SelfQR] EIP-191 signature generated:', signature);
       setSignature(signature);
-      setStatus('✅ Signature generated! You can now scan the QR code.');
+      setStatus('✅ EIP-191 signature generated! You can now scan the QR code.');
       return signature;
     } catch (error) {
-      console.error('[SelfQR] Error generating signature:', error);
-      setStatus('❌ Failed to generate signature. Please try again.');
+      console.error('[SelfQR] Error generating EIP-191 signature:', error);
+      setStatus('❌ Failed to generate EIP-191 signature. Please try again.');
       return '';
     }
   };
@@ -65,6 +65,25 @@ function Inner({ address }: Props) {
     // Use generated signature or placeholder if none available
     const signatureToUse = signature || '0x' + '0'.repeat(130);
     
+    // The contract expects 129 bytes: 64 bytes prefix + 65 bytes signature
+    // Create the userData array that matches what the contract expects
+    // let userDefinedData = signature
+    let userDefinedData;
+    if (signature) {
+      // Convert signature to hex string for userDefinedData
+      // Remove '0x' prefix and convert hex string to bytes
+      const signatureHex = signature.slice(2); // Remove '0x' prefix
+      const signatureBytes = new Uint8Array(signatureHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
+      userDefinedData = '0x' + Array.from(signatureBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      console.log('[SelfQR] userDefinedData length (hex chars):', userDefinedData.length - 2); // -2 for '0x'
+      console.log('[SelfQR] userDefinedData first 100 chars:', userDefinedData.substring(0, 100));
+      console.log('[SelfQR] userDefinedData last 100 chars:', userDefinedData.substring(userDefinedData.length - 100));
+    } else {
+      // Placeholder data
+      userDefinedData = '0x' + '0'.repeat(258); // 129 bytes = 258 hex chars
+    }
+    
     return new SelfAppBuilder({
       version: 2,
       appName: 'Self ↔ Pylon Demo',
@@ -73,7 +92,7 @@ function Inner({ address }: Props) {
       userId: address ?? '0x0000000000000000000000000000000000000000',
       endpointType: 'celo', // Use Celo for on-chain validation
       userIdType: 'hex',
-      userDefinedData: signatureToUse, // Pass the real signature here
+      userDefinedData: userDefinedData, // Pass the properly formatted data
       disclosures: {
         minimumAge: 18,
         ofac: true,
@@ -159,30 +178,48 @@ function Inner({ address }: Props) {
         }
       });
 
-      const hubRootAddr = (process.env.NEXT_PUBLIC_HUB_ROOT_ADDRESS || process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS) as `0x${string}`;
+      const proofOfHumanAddr = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS as `0x${string}`;
       
-      if (hubRootAddr && hubRootAddr !== '0x0000000000000000000000000000000000000000') {
-        const verified = await celoClient.readContract({
-          address: hubRootAddr,
-          abi: [{ 
-            name: 'isVerified', 
-            type: 'function', 
-            inputs: [{ name: 'user', type: 'address' }], 
-            outputs: [{ name: '', type: 'bool' }], 
-            stateMutability: 'view' 
-          }],
-          functionName: 'isVerified',
-          args: [address as `0x${string}`]
-        });
+      if (proofOfHumanAddr && proofOfHumanAddr !== '0x0000000000000000000000000000000000000000') {
+        console.log('[SelfQR] Checking verification status for address:', address);
+        console.log('[SelfQR] ProofOfHuman contract address:', proofOfHumanAddr);
         
-        if (verified) {
-          setStatus('✅ Verification successful! You are now attested as human on-chain.');
-          setProofData({ verified: true, address });
-        } else {
-          setStatus('❌ Verification failed or pending. Please try again.');
+        try {
+          // Check if the user is verified using the isVerified function
+          const isVerified = await celoClient.readContract({
+            address: proofOfHumanAddr,
+            abi: [{ 
+              name: 'isVerified', 
+              type: 'function', 
+              inputs: [{ name: 'user', type: 'address' }], 
+              outputs: [{ name: '', type: 'bool' }], 
+              stateMutability: 'view' 
+            }],
+            functionName: 'isVerified',
+            args: [address as `0x${string}`]
+          });
+          
+          console.log('[SelfQR] Verification result:', isVerified);
+          
+          if (isVerified) {
+            setStatus('✅ Verification successful! You are now attested as human on-chain.');
+            setProofData({ verified: true, address });
+          } else {
+            setStatus('❌ Verification failed or pending. Please try again.');
+          }
+        } catch (contractError: any) {
+          console.error('[SelfQR] Contract call error:', contractError);
+          
+          // Check if the contract exists and has code
+          const code = await celoClient.getBytecode({ address: proofOfHumanAddr });
+          if (!code || code === '0x') {
+            setStatus('❌ Contract not deployed at this address. Please check your configuration.');
+          } else {
+            setStatus(`❌ Contract call failed: ${contractError.message || 'Unknown error'}. The contract might not be properly initialized.`);
+          }
         }
       } else {
-        setStatus('❌ Contract address not configured. Cannot verify status.');
+        setStatus('❌ ProofOfHuman contract address not configured. Cannot verify status.');
       }
     } catch (error) {
       console.error('Error checking verification status:', error);
