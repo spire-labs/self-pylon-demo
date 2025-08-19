@@ -1,7 +1,7 @@
 "use client";
 import { useAccount, useConnect, useDisconnect, useWriteContract } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HumanNFTABI } from '@self-pylon-demo/abis';
 import Status from '../components/Status';
 
@@ -11,6 +11,13 @@ export default function Page() {
   const { disconnect } = useDisconnect();
   const [mintStatus, setMintStatus] = useState('');
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  
+  // Hydration safety - prevent server/client mismatch
+  const [isHydrated, setIsHydrated] = useState(false);
+  
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const handleMint = async () => {
     if (!address) return;
@@ -35,6 +42,16 @@ export default function Page() {
       setMintStatus(e?.message || 'Mint failed');
     }
   };
+
+  // Show loading state until hydrated to prevent mismatch
+  if (!isHydrated) {
+    return (
+      <main style={{ padding: 24, display: 'grid', gap: 16 }}>
+        <h1>Claim "I am human" NFT</h1>
+        <div>Loading...</div>
+      </main>
+    );
+  }
 
   return (
     <main style={{ padding: 24, display: 'grid', gap: 16 }}>
