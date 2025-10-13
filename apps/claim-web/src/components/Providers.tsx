@@ -5,17 +5,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { pylon } from '../chains/pylon';
 import { walletConnect, injected } from 'wagmi/connectors';
 
+const isBrowser = typeof window !== 'undefined';
+const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+
 const config = createConfig({
   chains: [pylon],
   transports: {
-    [pylon.id]: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || 'http://localhost:8546')
+    [pylon.id]: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || 'https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc')
   },
   connectors: [
     injected(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-self-pylon',
-      showQrModal: true
-    })
+    ...(isBrowser && wcProjectId
+      ? [
+          walletConnect({
+            projectId: wcProjectId,
+            showQrModal: true
+          })
+        ]
+      : [])
   ]
 });
 

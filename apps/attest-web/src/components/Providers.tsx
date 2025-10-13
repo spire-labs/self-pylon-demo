@@ -2,16 +2,16 @@
 import { PropsWithChildren, useState } from 'react';
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { celoL2 } from '../chains/celoL2';
+import { celo } from '../chains/celo';
 import { walletConnect, injected } from 'wagmi/connectors';
 
 const isBrowser = typeof window !== 'undefined';
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 const config = createConfig({
   ssr: true,
-  chains: [celoL2],
+  chains: [celo],
   transports: {
-    [celoL2.id]: http(process.env.NEXT_PUBLIC_CELO_L2_RPC_URL || 'http://localhost:8545')
+    [celo.id]: http(process.env.NEXT_PUBLIC_CELO_RPC_URL || 'https://forno.celo.org')
   },
   connectors: [
     injected(),

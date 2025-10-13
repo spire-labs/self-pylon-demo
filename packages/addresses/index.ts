@@ -1,21 +1,25 @@
-export type Network = 'celoL2' | 'pylon';
+export type Network = 'celo' | 'pylon';
 
 export type AddressBook = {
-  celoL2: {
-    registry?: `0x${string}`;
-    verifier?: `0x${string}`;
+  // Celo mainnet - where attestations happen
+  celo: {
+    proofOfHuman?: `0x${string}`;  // ProofOfHuman contract deployed on Celo
   };
+  // Pylon appchain - where claims happen
   pylon: {
-    humanNft?: `0x${string}`;
+    settlementPort?: `0x${string}`;        // Settlement port on Pylon (provided by Pylon)
+    proofOfHumanProxy?: `0x${string}`;     // SettlementForwardingProxy on Pylon
+    humanNft?: `0x${string}`;              // HumanNFT contract on Pylon
   };
 };
 
 export const addresses: AddressBook = {
-  celoL2: {
-    registry: '0x0000000000000000000000000000000000000000',
-    verifier: '0x0000000000000000000000000000000000000000'
+  celo: {
+    proofOfHuman: '0x0000000000000000000000000000000000000000'
   },
   pylon: {
+    settlementPort: '0x0000000000000000000000000000000000000042', // Fixed address on all Pylon chains
+    proofOfHumanProxy: '0x0000000000000000000000000000000000000000',
     humanNft: '0x0000000000000000000000000000000000000000'
   }
 };

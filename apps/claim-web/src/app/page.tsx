@@ -1,14 +1,16 @@
 "use client";
-import { useAccount, useConnect, useDisconnect, useWriteContract } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { useState, useEffect } from 'react';
 import { HumanNFTABI } from '@self-pylon-demo/abis';
+import { pylon } from '../chains/pylon';
 import Status from '../components/Status';
 
 export default function Page() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address, chainId } = useAccount();
   const { connect, isPending: isConnectPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
   const [mintStatus, setMintStatus] = useState('');
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
   
@@ -18,6 +20,13 @@ export default function Page() {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  // Auto-switch to Pylon when connected to wrong chain
+  useEffect(() => {
+    if (isConnected && chainId && chainId !== pylon.id) {
+      console.log(`Connected to chain ${chainId}, need to switch to Pylon (${pylon.id})`);
+    }
+  }, [isConnected, chainId]);
 
   const handleMint = async () => {
     if (!address) return;
@@ -62,9 +71,33 @@ export default function Page() {
           Connect Wallet
         </button>
       ) : (
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span>Connected: {address}</span>
-          <button onClick={() => disconnect()} style={{ padding: 8 }}>Disconnect</button>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span>Connected: {address}</span>
+            <button onClick={() => disconnect()} style={{ padding: 8 }}>Disconnect</button>
+          </div>
+          
+          {chainId && chainId !== pylon.id && (
+            <div style={{ 
+              padding: 12, 
+              backgroundColor: '#fff3cd', 
+              border: '1px solid #ffeaa7', 
+              borderRadius: '8px',
+              display: 'grid',
+              gap: 8
+            }}>
+              <strong>⚠️ Wrong Network</strong>
+              <p style={{ margin: 0, fontSize: 14 }}>
+                You're connected to chain {chainId}, but this app requires Pylon (chain {pylon.id}).
+              </p>
+              <button 
+                onClick={() => switchChain({ chainId: pylon.id })}
+                style={{ padding: 8, backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}
+              >
+                Switch to Pylon
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/token/ERC721/ERC721.sol";
 import "@openzeppelin/access/Ownable.sol";
 
-// Interface for ProofOfHuman contract on Celo L2
+// Interface for ProofOfHuman contract on Celo (accessed via SettlementForwardingProxy)
 interface IProofOfHuman {
     function isVerified(address user) external view returns (bool);
     function addressToNullifier(address user) external view returns (uint256);
@@ -14,7 +14,7 @@ contract HumanNFT is ERC721, Ownable {
     uint256 public nextId = 1;
     mapping(uint256 => bool) public nullifierMinted; // Track which nullifiers have been used
     
-    // ProofOfHuman contract address on Celo L2
+    // ProofOfHuman contract address (can be direct contract if deployed on the same chain or a SettlementForwardingProxy if deployed on pylon)
     address public proofOfHumanContract;
     
     // Events
