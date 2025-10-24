@@ -24,6 +24,10 @@ cd apps/claim-web
 OUTPUT_DIR=../../docs/claim pnpm build
 cd ../..
 
+# Add .nojekyll file to bypass Jekyll processing
+echo "📄 Adding .nojekyll file..."
+touch docs/.nojekyll
+
 echo "✅ Build complete! GitHub Pages directory structure:"
 echo "docs/"
 echo "├── attest/            # Attest app (Celo L2 verification)"
