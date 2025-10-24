@@ -352,6 +352,32 @@ pnpm --filter claim-web dev
 # tmux attach-session -t demo
 ```
 
+## Deployment
+
+### GitHub Pages Deployment
+
+To deploy the frontends to GitHub Pages:
+
+1. **Build the static sites**:
+   ```bash
+   ./scripts/build-for-deployment.sh
+   ```
+
+2. **Commit and push**:
+   ```bash
+   git add docs/
+   git commit -m "Deploy: Update GitHub Pages"
+   git push origin main
+   ```
+
+3. **Enable GitHub Pages** in your repo settings:
+   - Go to Settings → Pages
+   - Source: "Deploy from a branch"
+   - Branch: `main`
+   - Folder: `/docs`
+
+Your site will be available at `https://yourusername.github.io/self-pylon-demo/`
+
 ## Important Notes
 
 ### Cross-Chain Architecture
