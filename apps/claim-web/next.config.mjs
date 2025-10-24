@@ -4,6 +4,7 @@ const nextConfig = {
   output: 'export',
   trailingSlash: true,
   distDir: process.env.OUTPUT_DIR || 'out',
+  basePath: process.env.OUTPUT_DIR ? '/claim' : '',
   experimental: {
     typedRoutes: true
   }
