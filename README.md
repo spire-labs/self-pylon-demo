@@ -376,7 +376,9 @@ To deploy the frontends to GitHub Pages:
    - Branch: `main`
    - Folder: `/docs`
 
-Your site will be available at `https://yourusername.github.io/self-pylon-demo/`
+Your apps will be available at:
+- `https://yourusername.github.io/self-pylon-demo/attest/` (Attest app)
+- `https://yourusername.github.io/self-pylon-demo/claim/` (Claim app)
 
 ## Important Notes
 
