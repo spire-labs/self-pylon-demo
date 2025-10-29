@@ -169,12 +169,12 @@ function Inner({ address }: Props) {
       // Create a client to read from the contract
       const { createPublicClient, http } = await import('viem');
       const celoClient = createPublicClient({
-        transport: http(process.env.NEXT_PUBLIC_CELO_L2_RPC_URL || ''),
+        transport: http(process.env.NEXT_PUBLIC_CELO_RPC_URL || ''),
         chain: {
-          id: Number(process.env.NEXT_PUBLIC_CELO_L2_CHAIN_ID || 42220),
+          id: Number(process.env.NEXT_PUBLIC_CELO_CHAIN_ID || 42220),
           name: 'Celo L2',
           nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-          rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_CELO_L2_RPC_URL || ''] } }
+          rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_CELO_RPC_URL || ''] } }
         }
       });
 
@@ -221,9 +221,10 @@ function Inner({ address }: Props) {
       } else {
         setStatus('❌ ProofOfHuman contract address not configured. Cannot verify status.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking verification status:', error);
-      setStatus('❌ Error checking verification status. Please try again.');
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      setStatus(`❌ Error checking verification status: ${errorMessage}. Check the console for details.`);
     }
   };
 
