@@ -1,5 +1,5 @@
 "use client";
-import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain, usePublicClient } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { useState, useEffect } from 'react';
 import { HumanNFTABI } from '@self-pylon-demo/abis';
@@ -16,6 +16,7 @@ export default function Page() {
   const { switchChain } = useSwitchChain();
   const [mintStatus, setMintStatus] = useState('');
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  const publicClient = usePublicClient();
   
   // Hydration safety - prevent server/client mismatch
   const [isHydrated, setIsHydrated] = useState(false);
@@ -31,6 +32,75 @@ export default function Page() {
     }
   }, [isConnected, chainId]);
 
+  const waitForReceipt = async (txHash: `0x${string}`) => {
+    if (!publicClient) return;
+    
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash,
+      });
+      
+      if (receipt.status === 'reverted') {
+        // Get the transaction to retrieve revert reason via static call at the exact block
+        let revertReason = 'Transaction reverted';
+        try {
+          const tx = await publicClient.getTransaction({ hash: txHash });
+          // Static call at the exact block - read-only, uses exact same state and inputs
+          // This is deterministic and gives us the revert reason from the actual failed transaction
+          await publicClient.call({
+            to: tx.to,
+            data: tx.input,
+            account: tx.from,
+            blockNumber: receipt.blockNumber,
+          });
+          // Should not reach here if transaction reverted
+        } catch (callError: any) {
+          // Extract revert reason from the call error - this is the actual revert message
+          if (callError?.shortMessage) {
+            revertReason = callError.shortMessage;
+            // Clean up common prefixes
+            if (revertReason.includes('execution reverted: ')) {
+              revertReason = revertReason.replace('execution reverted: ', '');
+            } else if (revertReason.includes('execution reverted')) {
+              revertReason = revertReason.replace('execution reverted', '').trim();
+            }
+          } else if (callError?.message) {
+            revertReason = callError.message;
+            if (revertReason.includes('execution reverted: ')) {
+              revertReason = revertReason.replace('execution reverted: ', '');
+            } else if (revertReason.includes('execution reverted')) {
+              revertReason = revertReason.replace('execution reverted', '').trim();
+            }
+          } else if (callError?.cause?.reason) {
+            revertReason = callError.cause.reason;
+          } else if (callError?.cause?.data) {
+            // Try to decode if it's ABI-encoded revert data
+            revertReason = `Revert data: ${callError.cause.data}`;
+          }
+        }
+        setMintStatus(`Submitted: ${txHash}\n❌ ${revertReason}`);
+      } else {
+        setMintStatus(`Submitted: ${txHash}\n✅ Success! Transaction confirmed.`);
+      }
+    } catch (e: any) {
+      console.error('Error waiting for receipt:', e);
+      let errorMessage = 'Transaction reverted';
+      
+      if (e?.shortMessage) {
+        errorMessage = e.shortMessage;
+      } else if (e?.message) {
+        errorMessage = e.message;
+        if (errorMessage.includes('execution reverted: ')) {
+          errorMessage = errorMessage.replace('execution reverted: ', '');
+        }
+      } else if (e?.cause?.reason) {
+        errorMessage = e.cause.reason;
+      }
+      
+      setMintStatus(`Submitted: ${txHash}\n❌ ${errorMessage}`);
+    }
+  };
+
   const handleMint = async () => {
     if (!address) return;
     
@@ -41,17 +111,47 @@ export default function Page() {
         return;
       }
       
+      if (!publicClient) {
+        setMintStatus('Error: Public client not available');
+        return;
+      }
+      
       setMintStatus('Minting...');
-      const tx = await writeContractAsync({
+      const txHash = await writeContractAsync({
         address: nftAddr,
         abi: HumanNFTABI,
         functionName: 'mint',
         args: []
       });
-      setMintStatus(`Submitted: ${tx}`);
+      
+      // Show transaction hash immediately with loading indicator
+      setMintStatus(`Submitted: ${txHash}\n⏳ Waiting for confirmation...`);
+      
+      // Wait for receipt separately (fire and forget)
+      waitForReceipt(txHash);
     } catch (e: any) {
       console.error('Mint error:', e);
-      setMintStatus(e?.message || 'Mint failed');
+      // Extract error message from various error formats
+      let errorMessage = 'Transaction failed';
+      const error = e;
+      
+      if (error?.shortMessage) {
+        errorMessage = error.shortMessage;
+      } else if (error?.message) {
+        errorMessage = error.message;
+        // Try to clean up common error prefixes
+        if (errorMessage.includes('execution reverted: ')) {
+          errorMessage = errorMessage.replace('execution reverted: ', '');
+        }
+      } else if (error?.cause?.data) {
+        errorMessage = `Transaction failed: ${error.cause.data}`;
+      } else if (error?.cause?.reason) {
+        errorMessage = `Transaction failed: ${error.cause.reason}`;
+      } else if (error?.data?.message) {
+        errorMessage = error.data.message;
+      }
+      
+      setMintStatus(`❌ ${errorMessage}`);
     }
   };
 
@@ -182,7 +282,7 @@ export default function Page() {
                     </Button>
                     {mintStatus && (
                       <div className="mt-4 p-3 bg-neutral-100 rounded-lg">
-                        <p className="text-sm text-neutral-700">{mintStatus}</p>
+                        <p className="text-sm text-neutral-700 whitespace-pre-line">{mintStatus}</p>
                       </div>
                     )}
                   </div>
