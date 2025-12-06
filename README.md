@@ -2,15 +2,38 @@
 
 A fully on-chain, privacy-preserving identity attestation system using the Self protocol and Pylon appchain with **true cross-chain architecture**.
 
+## Frontends
+
+This project includes three frontend applications:
+
+1. **`unified-web`** (Recommended): A unified frontend that combines the complete flow from attestation to NFT minting in a single, well-designed application. This is the primary frontend and matches the Spire design mockup.
+
+2. **`attest-web`** (Legacy): Separate frontend for the attestation flow on Celo mainnet.
+
+3. **`claim-web`** (Legacy): Separate frontend for the NFT minting flow on Pylon appchain.
+
+The unified frontend provides a seamless user experience with automatic network switching and a single flow from wallet connection → attestation → NFT minting.
+
 ### Test the Complete Flow
 
-1. **Connect Wallet (Celo)**: Connect your wallet to Celo mainnet
+**Option 1: Unified Frontend (Recommended)**
+1. **Connect Wallet**: Connect your wallet to start the flow
+2. **Generate Signature**: Sign a message to prove address ownership
+3. **Scan QR Code**: Use Self app to scan passport and generate proof
+4. **Automatic Submission**: Self automatically submits proof to ProofOfHuman contract **on Celo mainnet**
+5. **ProofOfHuman**: Binds your wallet address to your passport without revealing passport details
+6. **Switch to Pylon**: The app automatically switches to Pylon appchain
+7. **Claim NFT**: Mint the "I am human" NFT on Pylon
+8. **Cross-Chain Verification**: The HumanNFT contract on Pylon reads your attestation from Celo via Pylon's settlement mechanism
+
+**Option 2: Separate Frontends (Legacy)**
+1. **Connect Wallet (Celo)**: Connect your wallet to Celo mainnet using `attest-web`
 2. **Generate Signature**: Sign a message to prove address ownership
 3. **Scan QR Code**: Use Self app to scan passport and generate proof
 4. **Automatic Submission**: Self automatically submits proof to ProofOfHuman contract **on Celo mainnet**
 5. **ProofOfHuman**: Binds your wallet address to your passport without revealing passport details
 6. **Switch to Pylon**: Connect to the Pylon appchain
-7. **Claim NFT**: Visit claim-web on Pylon appchain and mint the "I am human" NFT
+7. **Claim NFT**: Visit `claim-web` on Pylon appchain and mint the "I am human" NFT
 8. **Cross-Chain Verification**: The HumanNFT contract on Pylon reads your attestation from Celo via Pylon's settlement mechanism
 
 ## Architecture
@@ -24,6 +47,7 @@ This system enables:
 ```mermaid
 graph TD
     U[User]:::userLayer
+    UW[unified-web]:::serviceLayer
     AW[attest-web on Celo]:::serviceLayer
     CW[claim-web on Pylon]:::serviceLayer
     SA[Self Mobile App]:::externalLayer
@@ -39,13 +63,15 @@ graph TD
         HN[HumanNFT Contract]:::contractLayer
     end
     
-    U -->|1- Connect & Sign| AW
-    AW -->|2- Display QR| AW
+    U -->|1- Connect & Sign| UW
+    UW -->|2- Display QR| UW
     U -->|3- Scan QR| SA
     SA -->|4- Submit ZK Proof| SH
     SH -->|5- Verify & Store| PH
-    U -->|6- Switch Network & Mint| CW
-    CW -->|7- Mint Request| HN
+    UW -->|6- Switch Network & Mint| UW
+    UW -->|7- Mint Request| HN
+    U -.->|Legacy: Separate Apps| AW
+    AW -.->|Legacy: Separate Apps| CW
     HN -->|8- Read Attestation| PROXY
     PROXY -->|9- Settlement Read| SP
     SP -.->|10- Cross-chain Read| PH
@@ -109,8 +135,23 @@ NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
-# Start both apps simultaneously
-pnpm --parallel --filter attest-web --filter claim-web dev
+# Configure unified-web (recommended - combines both flows)
+cat > apps/unified-web/.env.local << EOF
+NEXT_PUBLIC_CELO_RPC_URL=$CELO_RPC_URL
+NEXT_PUBLIC_CELO_CHAIN_ID=$CELO_CHAIN_ID
+NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS=$PROOF_OF_HUMAN_ADDRESS
+NEXT_PUBLIC_SELF_SCOPE=$NEXT_PUBLIC_SELF_SCOPE
+NEXT_PUBLIC_PYLON_RPC_URL=$PYLON_RPC_URL
+NEXT_PUBLIC_PYLON_CHAIN_ID=$PYLON_CHAIN_ID
+NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+EOF
+
+# Start unified-web (recommended)
+pnpm --filter unified-web dev
+
+# OR start both legacy apps simultaneously
+# pnpm --parallel --filter attest-web --filter claim-web dev
 ```
 
 **Note**: The existing deployment uses the cross-chain architecture where attestations are on Celo and claims happen on Pylon via settlement.
@@ -296,13 +337,34 @@ lowercase_nft=$(jq -r '.transactions[] | select(.contractName=="HumanNFT") | .co
 export HUMAN_NFT_ADDRESS=$(cast to-check-sum-address $lowercase_nft)
 echo "HumanNFT deployed on Pylon at: $HUMAN_NFT_ADDRESS"
 echo ""
-echo "✅ Cross-chain setup complete!"
-echo "   - Attestations are stored on Celo: $PROOF_OF_HUMAN_ADDRESS"
+echo "✅ Cross-chain setup complete"'!'
+echo "   - Attestations are stored on Celo: ${PROOF_OF_HUMAN_ADDRESS}"
 echo "   - Claims happen on Pylon: $HUMAN_NFT_ADDRESS"
 echo "   - Settlement proxy on Pylon: $PROOF_OF_HUMAN_PROXY"
 ```
 
 ## 4. Configure Frontend
+
+**Recommended: Unified Frontend**
+
+```bash
+# Configure unified-web (combines both Celo and Pylon flows)
+cat > apps/unified-web/.env.local << EOF
+NEXT_PUBLIC_CELO_RPC_URL=$CELO_RPC_URL
+NEXT_PUBLIC_CELO_CHAIN_ID=$CELO_CHAIN_ID
+NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS=$PROOF_OF_HUMAN_ADDRESS
+NEXT_PUBLIC_SELF_SCOPE=$NEXT_PUBLIC_SELF_SCOPE
+NEXT_PUBLIC_PYLON_RPC_URL=$PYLON_RPC_URL
+NEXT_PUBLIC_PYLON_CHAIN_ID=$PYLON_CHAIN_ID
+NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
+EOF
+
+echo "✅ Unified frontend configured"'!'
+echo "   - unified-web supports both Celo (chain $CELO_CHAIN_ID) and Pylon (chain $PYLON_CHAIN_ID)"
+```
+
+**Legacy: Separate Frontends**
 
 ```bash
 # Configure attest-web (runs on Celo mainnet)
@@ -322,16 +384,27 @@ NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
-echo "✅ Frontend configured!"
+echo "✅ Legacy frontends configured"'!'
 echo "   - attest-web connects to Celo mainnet (chain $CELO_CHAIN_ID)"
 echo "   - claim-web connects to Pylon appchain (chain $PYLON_CHAIN_ID)"
 
 # Build static sites
-pnpm --filter attest-web build
-pnpm --filter claim-web build
+pnpm --filter unified-web build
+# OR for legacy apps:
+# pnpm --filter attest-web build
+# pnpm --filter claim-web build
 ```
 
 ## 5. Run the Project
+
+**Recommended: Unified Frontend**
+
+```bash
+# Start unified-web (single app with complete flow)
+pnpm --filter unified-web dev
+```
+
+**Legacy: Separate Frontends**
 
 ```bash
 # Option 1: Start both apps simultaneously using pnpm parallel execution
@@ -356,9 +429,9 @@ pnpm --filter claim-web dev
 
 ### GitHub Pages Deployment
 
-To deploy the frontends to GitHub Pages:
+To deploy the unified frontend to GitHub Pages:
 
-1. **Build the static sites**:
+1. **Build the static site**:
    ```bash
    ./scripts/build-for-deployment.sh
    ```
@@ -376,9 +449,10 @@ To deploy the frontends to GitHub Pages:
    - Branch: `main`
    - Folder: `/docs`
 
-Your apps will be available at:
-- `https://yourusername.github.io/self-pylon-demo/attest/` (Attest app)
-- `https://yourusername.github.io/self-pylon-demo/claim/` (Claim app)
+Your unified app will be available at:
+- `https://yourusername.github.io/self-pylon-demo/` (Unified frontend - recommended)
+
+**Note**: The build script now builds `unified-web` to the `docs/` root. The legacy `attest-web` and `claim-web` apps are still available in the codebase but are not deployed by default.
 
 ## Important Notes
 

@@ -1,0 +1,134 @@
+.wrapper {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alert {
+  background: #ffeaf0;
+  border-radius: 4px;
+
+  padding: 2px;
+  font-family: "Work Sans", sans-serif;
+}
+
+.alertBlock {
+  padding: 16px;
+}
+
+.alertHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.alertTitle {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #aa002f;
+}
+
+.alertText {
+  font-family: Work Sans;
+  font-weight: 400;
+  font-style: Regular;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #aa002f;
+  opacity: 50%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.primaryButton {
+  width: 100%;
+  border: none;
+  border-radius: 2px;
+  padding: 16px 18px;
+  background: #0b1b47;
+  color: #ffffff;
+  font-family: "Work Sans", sans-serif;
+  font-weight: 500;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  text-align: center;
+  cursor: pointer;
+}
+
+.walletCard {
+  background: #0b1b4708;
+  padding: 20px;
+}
+
+.walletRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.walletLabel {
+  font-family: "Work Sans", sans-serif;
+  font-weight: 500;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+}
+
+.disconnect {
+  font-family: "Work Sans", sans-serif;
+  font-weight: 500;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: auto;
+  opacity: 0.5;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.walletAddress {
+  margin-top: 4px;
+  font-family: "Work Sans", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+  opacity: 0.5;
+}
+
+@media (max-width: 767px) {
+  .wrapper {
+    max-width: 360px;
+  }
+
+  .primaryButton {
+    font-size: 14px;
+  }
+}
+
+
+

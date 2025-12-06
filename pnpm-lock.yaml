@@ -137,6 +137,70 @@ importers:
         specifier: ^5.5.4
         version: 5.9.2
 
+  apps/unified-web:
+    dependencies:
+      '@self-pylon-demo/abis':
+        specifier: workspace:*
+        version: link:../../packages/abis
+      '@selfxyz/qrcode':
+        specifier: 1.0.11
+        version: 1.0.11(bufferutil@4.0.9)(jiti@2.6.1)(lottie-react@2.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(postcss@8.5.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.2)(utf-8-validate@5.0.10)
+      '@tanstack/react-query':
+        specifier: ^5.51.1
+        version: 5.84.2(react@18.3.1)
+      lottie-react:
+        specifier: ^2.4.1
+        version: 2.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      next:
+        specifier: 14.2.5
+        version: 14.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
+      viem:
+        specifier: ^2.10.9
+        version: 2.33.3(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)(zod@3.22.4)
+      wagmi:
+        specifier: ^2.16.1
+        version: 2.16.1(@tanstack/query-core@5.83.1)(@tanstack/react-query@5.84.2(react@18.3.1))(@types/react@18.3.23)(bufferutil@4.0.9)(react@18.3.1)(typescript@5.9.2)(utf-8-validate@5.0.10)(viem@2.33.3(bufferutil@4.0.9)(typescript@5.9.2)(utf-8-validate@5.0.10)(zod@3.22.4))(zod@3.22.4)
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.1.16
+        version: 4.1.16
+      '@types/node':
+        specifier: ^20.14.10
+        version: 20.19.10
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.23
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.23)
+      autoprefixer:
+        specifier: ^10.4.21
+        version: 10.4.21(postcss@8.5.6)
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      eslint-config-next:
+        specifier: 14.2.5
+        version: 14.2.5(eslint@8.57.1)(typescript@5.9.2)
+      tailwind-merge:
+        specifier: ^3.3.1
+        version: 3.3.1
+      tailwindcss:
+        specifier: ^4.1.16
+        version: 4.1.16
+      typescript:
+        specifier: ^5.5.4
+        version: 5.9.2
+
   packages/abis: {}
 
   packages/addresses: {}
@@ -1815,9 +1879,6 @@ packages:
   camelcase@6.3.0:
     resolution: {integrity: sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==}
     engines: {node: '>=10'}
-
-  caniuse-lite@1.0.30001733:
-    resolution: {integrity: sha512-e4QKw/O2Kavj2VQTKZWrwzkt3IxOmIlU6ajRb6LP64LHpBo1J67k2Hi4Vu/TgJWsNtynurfS0uK3MaUTCPfu5Q==}
 
   caniuse-lite@1.0.30001751:
     resolution: {integrity: sha512-A0QJhug0Ly64Ii3eIqHu5X51ebln3k4yTUkY1j8drqpWHVreg/VLijN48cZ1bYPiqOQuqpkIKnzr/Ul8V+p6Cw==}
@@ -7188,8 +7249,6 @@ snapshots:
 
   camelcase@6.3.0: {}
 
-  caniuse-lite@1.0.30001733: {}
-
   caniuse-lite@1.0.30001751: {}
 
   chai@4.5.0:
@@ -8914,7 +8973,7 @@ snapshots:
       '@next/env': 14.2.5
       '@swc/helpers': 0.5.5
       busboy: 1.6.0
-      caniuse-lite: 1.0.30001733
+      caniuse-lite: 1.0.30001751
       graceful-fs: 4.2.11
       postcss: 8.4.31
       react: 18.3.1

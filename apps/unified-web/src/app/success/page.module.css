@@ -1,0 +1,197 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 120px 16px 16px;
+  background:
+    linear-gradient(180deg, rgba(196, 220, 246, 0.8) 0%, rgba(255, 255, 255, 0.6) 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 25.69%, rgba(255, 248, 193, 0.4) 62.35%, rgba(255, 213, 224, 0.6) 84.19%, rgba(255, 203, 255, 0.7) 100%);
+}
+
+.content {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+}
+
+.card {
+  width: 100%;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 4px;
+}
+
+.topText {
+  padding: 16px;
+  background: url("/mint/diamond.svg") center/cover no-repeat;
+  width: 480px;
+  height: 400px;
+}
+
+.imageBlock {
+  width: 480px;
+  height: 400px;
+  background: url("/mint/diamond.svg") center/cover no-repeat;
+  margin: 0 auto;
+  border: 1px solid #d0d0d0;
+}
+
+/* верхняя зона с текстом и иллюстрацией */
+
+.cardTop {
+  padding: 32px 32px 240px;
+  background: url("/mint/diamond.svg") bottom right/contain no-repeat;
+}
+
+.textBlock {
+  padding-bottom: 24px;
+}
+
+.title {
+  /* font-family: "Concrette S TRIAL", sans-serif; */
+  /* font-weight: 500; */
+  /* font-size: 32px; */
+  /* line-height: 105%; */
+  /* letter-spacing: -0.02em; */
+  margin-bottom: 12px;
+  font-family: Concrette S TRIAL;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 40px;
+  leading-trim: NONE;
+  line-height: 90%;
+  letter-spacing: -0.02em;
+  color: #0b1b47;
+}
+
+.subtitle {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+}
+
+.imageWrapper {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.image {
+  max-width: 220px;
+  width: 100%;
+  height: auto;
+}
+
+.verifiedBanner {
+  display: flex;
+  flex-direction: column;
+  padding: 2px;
+  background: #c5f7e380;
+  border-radius: 2px;
+}
+
+.verified {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px;
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #006a40;
+}
+
+.shieldIcon {
+  font-size: 16px;
+}
+
+.primaryButton {
+  border: none;
+  width: 100%;
+  padding: 16px 18px;
+  background: #0b1b47;
+  color: #ffffff;
+  font-family: "Work Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  cursor: pointer;
+}
+
+
+
+/* На планшетах и десктопах */
+/* @media (min-width: 768px) { */
+.desktopText {
+  display: block;
+}
+.mobileText {
+  display: none;
+}
+/* } */
+
+
+@media (max-width: 767px) {
+  .page {
+    padding: 144px 16px 40px;
+  }
+  
+  .content {
+    max-width: 358px;
+  }
+  
+  .cardTop {
+    grid-template-columns: 1fr;
+    padding: 24px 20px 0;
+  }
+  
+  .imageWrapper {
+    justify-content: center;
+  }
+
+  .image {
+    max-width: 260px;
+  }
+
+  .imageBlock {
+    width: 358px;
+    height: 280px;
+    background-size: cover;
+  }
+
+  .topText {
+    width: 358px;
+    height: 280px;
+    border: 1px solid #0b1b47;
+    border-radius: 2px;
+  }
+
+  .title {
+    font-size: 28px;
+    line-height: 110%;
+  }
+  
+  .desktopText {
+    display: none;
+  }
+
+  .mobileText {
+    display: block;
+  }
+}
+
+
+

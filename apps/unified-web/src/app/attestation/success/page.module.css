@@ -1,0 +1,58 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 120px 16px 80px;
+  background: linear-gradient(0deg, #ffffff00, #ffffff00),
+    linear-gradient(
+      180deg,
+      rgba(189, 194, 247, 0.75) -16.5%,
+      rgba(255, 255, 255, 0.5) 75.77%
+    );
+}
+
+.content {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  align-items: center;
+}
+
+.heading {
+  text-align: center;
+}
+
+.title {
+  font-family: "Concrette S TRIAL", sans-serif;
+  font-weight: 500;
+  font-size: 40px;
+  line-height: 90%;
+  letter-spacing: -0.02em;
+  color: #0b1b47;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-family: "Work Sans", sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+}
+
+@media (max-width: 767px) {
+  .page {
+    padding: 144px 16px 40px;
+  }
+
+  .title {
+    font-size: 32px;
+  }
+}
+
+
+

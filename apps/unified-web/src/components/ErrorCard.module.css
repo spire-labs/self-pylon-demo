@@ -1,0 +1,204 @@
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: #0b1b4708;
+  border-radius: 4px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-family: Concrette S TRIAL;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 24px;
+  leading-trim: NONE;
+  line-height: 100%;
+  letter-spacing: -2%;
+  color: #0b1b47;
+  padding-bottom: 14px;
+}
+
+.successPadding {
+  padding: 2px;
+  background: #ffffff;
+  border-radius: 2px;
+}
+
+.errorPadding {
+  padding: 2px;
+  background: #ffd4e080;
+  border-radius: 2px;
+}
+
+.successPaddingQr {
+  background: #ffffff;
+  border-radius: 2px;
+  padding: 4px;
+}
+
+.successBanner {
+  background: #c5f7e380;
+  padding: 16px;
+  border-radius: 2px;
+  font-family: "Work Sans", sans-serif;
+  color: #0b1b47;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stepBlock {
+  display: flex;
+  gap: 4px;
+  padding: 16px;
+}
+
+.stepNumber {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+  opacity: 50%;
+}
+
+.stepNumberStrong {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+}
+
+.successTitle {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05%;
+  color: #006a40;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.signatureHash {
+  font-family: Work Sans;
+  font-weight: 400;
+  font-style: Regular;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05%;
+  opacity: 50%;
+  color: #006a40;
+}
+
+.qrWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 16px;
+}
+
+.qrText {
+  font-family: Work Sans;
+  font-weight: 400;
+  font-style: Regular;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -5%;
+  color: #0b1b47;
+  padding-top: 8px;
+  padding-bottom: 4px;
+  opacity: 50%;
+}
+
+.selfLogo {
+  width: 80px;
+  margin-top: 4px;
+}
+
+.primaryButton {
+  width: 100%;
+  background: #0b1b47;
+  color: white;
+  border: none;
+  padding: 14px 18px;
+  font-size: 14px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.disabledStep {
+  opacity: 0.3;
+  font-size: 14px;
+  font-family: "Work Sans";
+}
+
+.stepBlock {
+  display: flex;
+  gap: 4px;
+}
+
+.errorBanner {
+  padding: 16px;
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #aa002f;
+}
+
+.alertHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+}
+
+.alertTitle {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #aa002f;
+}
+
+
+
+@media (max-width: 767px) {
+  .card {
+    max-width: 358px;
+  }
+
+  .cardBorder {
+    height: 280px;
+  }
+
+  .cardSection {
+  height: 230px;
+}
+}
+
+
+

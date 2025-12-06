@@ -1,0 +1,31 @@
+.container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  padding: 12px 12px;
+  z-index: 50;
+}
+
+.logoContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .lottie {
+    width: 28.1px !important;
+    height: 28.25px !important;
+  }
+  .logo {
+    width: 56.42px !important;
+    height: 21.85px !important;
+  }
+}
+
+
+

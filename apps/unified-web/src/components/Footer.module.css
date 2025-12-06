@@ -1,0 +1,22 @@
+.container {
+  position: fixed;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 15px 16px 16px 16px;
+}
+
+.footerText {
+  font-family: "Work Sans", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 14px;
+  text-align: center;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #0b1b47;
+  opacity: 0.5;
+}
+
