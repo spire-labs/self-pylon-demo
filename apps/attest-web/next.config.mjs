@@ -7,7 +7,17 @@ const nextConfig = {
   basePath: process.env.OUTPUT_DIR ? '/attest' : '',
   experimental: {
     typedRoutes: true
-  }
+  },
+  webpack: (config, { isServer }) => {
+    // pino-pretty is an optional dependency of pino (used by WalletConnect)
+    // Since we're building a static export, we don't need it. Provide an empty module.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'pino-pretty': false,
+    };
+    
+    return config;
+  },
 };
 
 export default nextConfig;
