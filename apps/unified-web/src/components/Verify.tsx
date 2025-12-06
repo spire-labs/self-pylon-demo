@@ -8,11 +8,7 @@ import successStyles from './VerifySuccessCard.module.css';
 import errorStyles from './VerifyErrorCard.module.css';
 import buttonStyles from './ui/Button.module.css';
 import { pylon } from '../chains/pylon';
-import { HumanNFTABI, ProofOfHumanABI } from '@self-pylon-demo/abis';
-
-// TEMPORARY: Switch verification checks to Celo while Pylon CORS issues are resolved
-// To switch back to Pylon: set USE_CELO_FOR_VERIFICATION to false
-const USE_CELO_FOR_VERIFICATION = true;
+import { HumanNFTABI } from '@self-pylon-demo/abis';
 
 type VerifyState = 'step1' | 'success' | 'error';
 
@@ -38,8 +34,8 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
   const effectiveAddress = address || connectedAddress;
 
   // Check verification status function - called manually when user clicks button
-  // TEMPORARY: Using Celo + ProofOfHuman while Pylon CORS issues are resolved
-  // When Pylon CORS is fixed, switch back by setting USE_CELO_FOR_VERIFICATION to false
+  // Use HumanNFT contract on Pylon to check verification (via SettlementForwardingProxy)
+  // This uses the same mechanism as mint() and reads from Celo synchronously through Pylon
   const checkVerification = async () => {
     if (!effectiveAddress) return;
 
@@ -48,74 +44,37 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
     
     try {
       const { createPublicClient, http } = await import('viem');
-      
-      if (USE_CELO_FOR_VERIFICATION) {
-        // TEMPORARY: Use Celo + ProofOfHuman directly (bypasses Pylon CORS issues)
-        const celoClient = createPublicClient({
-          transport: http(process.env.NEXT_PUBLIC_CELO_RPC_URL || ''),
-          chain: {
-            id: Number(process.env.NEXT_PUBLIC_CELO_CHAIN_ID || 42220),
-            name: 'Celo',
-            nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-            rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_CELO_RPC_URL || ''] } }
-          }
-        });
-
-        const proofOfHumanAddr = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS as `0x${string}`;
-        if (proofOfHumanAddr && proofOfHumanAddr !== '0x0000000000000000000000000000000000000000') {
-          const verified = await celoClient.readContract({
-            address: proofOfHumanAddr,
-            abi: ProofOfHumanABI,
-            functionName: 'isVerified',
-            args: [effectiveAddress as `0x${string}`]
-          });
-          
-          if (verified) {
-            setIsVerified(true);
-            setMintStatus('');
-            setState('success');
-          } else {
-            setIsVerified(false);
-            setMintStatus('');
-            // User is not verified, redirect to attestation
-            router.push('/attestation/one');
-          }
+      const pylonClient = createPublicClient({
+        transport: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''),
+        chain: {
+          id: Number(process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 2139),
+          name: 'Pylon',
+          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
+          rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''] } }
         }
-      } else {
-        // PYLON PATH: Use HumanNFT contract on Pylon to check verification (via SettlementForwardingProxy)
-        // This avoids duplicate Celo RPC calls and uses the same mechanism as mint()
-        const pylonClient = createPublicClient({
-          transport: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''),
-          chain: {
-            id: Number(process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 2139),
-            name: 'Pylon',
-            nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-            rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''] } }
-          }
-        });
+      });
 
-        const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
-        if (nftAddr && nftAddr !== '0x0000000000000000000000000000000000000000') {
-          // Use HumanNFT's getNullifierForAddress - returns 0 if not verified, non-zero if verified
-          // This internally calls ProofOfHuman through SettlementForwardingProxy on Pylon
-          const nullifier = await pylonClient.readContract({
-            address: nftAddr,
-            abi: HumanNFTABI,
-            functionName: 'getNullifierForAddress',
-            args: [effectiveAddress as `0x${string}`]
-          });
-          
-          const verified = nullifier !== BigInt(0);
-          if (verified) {
-            setIsVerified(true);
-            setMintStatus('');
-            setState('success');
-          } else {
-            setIsVerified(false);
-            setMintStatus('');
-            // User is not verified, redirect to attestation
-            router.push('/attestation/one');
-          }
+      const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
+      if (nftAddr && nftAddr !== '0x0000000000000000000000000000000000000000') {
+        // Use HumanNFT's getNullifierForAddress - returns 0 if not verified, non-zero if verified
+        // This internally calls ProofOfHuman through SettlementForwardingProxy on Pylon
+        const nullifier = await pylonClient.readContract({
+          address: nftAddr,
+          abi: HumanNFTABI,
+          functionName: 'getNullifierForAddress',
+          args: [effectiveAddress as `0x${string}`]
+        });
+        
+        const verified = nullifier !== BigInt(0);
+        if (verified) {
+          setIsVerified(true);
+          setMintStatus('');
+          setState('success');
+        } else {
+          setIsVerified(false);
+          setMintStatus('');
+          // User is not verified, redirect to attestation
+          router.push('/attestation/one');
         }
       }
     } catch (error: any) {
@@ -556,7 +515,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
                   cursor: 'pointer'
                 }}
               >
-                Get CELO from faucet
+                Get Pylon test CELO from faucet
               </a>
             </div>
           </div>
