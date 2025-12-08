@@ -6,11 +6,11 @@ A fully on-chain, privacy-preserving identity attestation system using the Self 
 
 This project includes three frontend applications:
 
-1. **`unified-web`** (Recommended): A unified frontend that combines the complete flow from attestation to NFT minting in a single, well-designed application. This is the primary frontend and matches the Spire design mockup.
+1. **`unified-web`** (Default & Recommended): A unified frontend that combines the complete flow from attestation to NFT minting in a single, well-designed application. This is the primary frontend and matches the Spire design mockup. **Use this for all new deployments.**
 
-2. **`attest-web`** (Legacy): Separate frontend for the attestation flow on Celo mainnet.
+2. **`attest-web`** (Legacy): Separate frontend for the attestation flow on Celo mainnet. **Deprecated - use unified-web instead.**
 
-3. **`claim-web`** (Legacy): Separate frontend for the NFT minting flow on Pylon appchain.
+3. **`claim-web`** (Legacy): Separate frontend for the NFT minting flow on Pylon appchain. **Deprecated - use unified-web instead.**
 
 The unified frontend provides a seamless user experience with automatic network switching and a single flow from wallet connection → attestation → NFT minting.
 
@@ -70,8 +70,8 @@ graph TD
     SH -->|5- Verify & Store| PH
     UW -->|6- Switch Network & Mint| UW
     UW -->|7- Mint Request| HN
-    U -.->|Legacy: Separate Apps| AW
-    AW -.->|Legacy: Separate Apps| CW
+    U -.->|Legacy (deprecated)| AW
+    AW -.->|Legacy (deprecated)| CW
     HN -->|8- Read Attestation| PROXY
     PROXY -->|9- Settlement Read| SP
     SP -.->|10- Cross-chain Read| PH
@@ -116,7 +116,7 @@ export PYLON_SETTLEMENT_PORT=0x0000000000000000000000000000000000000042
 # Celo contract address
 # export HUMAN_NFT_ADDRESS=0xE95515970B457130B5D891666e02ABBA49c84448
 # Pylon contract address
-export HUMAN_NFT_ADDRESS=0xF54a6f384d88afB9c9b48fa9979BBdf445B8eC6D
+export HUMAN_NFT_ADDRESS=0x0A2222269B3e6AB7426a45347D080BB68Ce22e73
 
 # Configure attest-web (Celo mainnet)
 cat > apps/attest-web/.env.local << EOF
@@ -147,11 +147,8 @@ NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
-# Start unified-web (recommended)
+# Start unified-web
 pnpm --filter unified-web dev
-
-# OR start both legacy apps simultaneously
-# pnpm --parallel --filter attest-web --filter claim-web dev
 ```
 
 **Note**: The existing deployment uses the cross-chain architecture where attestations are on Celo and claims happen on Pylon via settlement.
@@ -345,10 +342,10 @@ echo "   - Settlement proxy on Pylon: $PROOF_OF_HUMAN_PROXY"
 
 ## 4. Configure Frontend
 
-**Recommended: Unified Frontend**
+**Default: Unified Frontend (Required)**
 
 ```bash
-# Configure unified-web (combines both Celo and Pylon flows)
+# Configure unified-web (complete flow in one app - REQUIRED)
 cat > apps/unified-web/.env.local << EOF
 NEXT_PUBLIC_CELO_RPC_URL=$CELO_RPC_URL
 NEXT_PUBLIC_CELO_CHAIN_ID=$CELO_CHAIN_ID
@@ -362,11 +359,18 @@ EOF
 
 echo "✅ Unified frontend configured"'!'
 echo "   - unified-web supports both Celo (chain $CELO_CHAIN_ID) and Pylon (chain $PYLON_CHAIN_ID)"
+echo "   - Complete flow: attestation → NFT minting in one seamless experience"
+
+# Build the unified frontend
+pnpm --filter unified-web build
 ```
 
-**Legacy: Separate Frontends**
+**Legacy: Separate Frontends (Deprecated)**
+
+⚠️ **These are deprecated and will be removed soon. Use unified-web instead.**
 
 ```bash
+# Only configure these if you must maintain legacy deployments
 # Configure attest-web (runs on Celo mainnet)
 cat > apps/attest-web/.env.local << EOF
 NEXT_PUBLIC_CELO_RPC_URL=$CELO_RPC_URL
@@ -383,51 +387,34 @@ NEXT_PUBLIC_PYLON_CHAIN_ID=$PYLON_CHAIN_ID
 NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
-
-echo "✅ Legacy frontends configured"'!'
-echo "   - attest-web connects to Celo mainnet (chain $CELO_CHAIN_ID)"
-echo "   - claim-web connects to Pylon appchain (chain $PYLON_CHAIN_ID)"
-
-# Build static sites
-pnpm --filter unified-web build
-# OR for legacy apps:
-# pnpm --filter attest-web build
-# pnpm --filter claim-web build
 ```
 
 ## 5. Run the Project
 
-**Recommended: Unified Frontend**
+**Default: Unified Frontend**
 
 ```bash
-# Start unified-web (single app with complete flow)
+# Start unified-web (complete flow in one app)
 pnpm --filter unified-web dev
 ```
 
-**Legacy: Separate Frontends**
+**Legacy: Separate Frontends (Deprecated)**
+
+⚠️ **These are deprecated and will be removed soon. Use unified-web instead.**
 
 ```bash
-# Option 1: Start both apps simultaneously using pnpm parallel execution
+# Only use these for legacy development/testing
+# Start both apps simultaneously
 pnpm --parallel --filter attest-web --filter claim-web dev
 
-# Option 2: Start them in separate terminals (recommended for development)
-# Terminal 1: attest-web
-pnpm --filter attest-web dev
-
-# Terminal 2: claim-web  
-pnpm --filter claim-web dev
-
-# Option 3: Use tmux/screen to manage multiple terminals
-# tmux new-session -d -s demo
-# tmux send-keys -t demo:0 "pnpm --filter attest-web dev" Enter
-# tmux split-window -h
-# tmux send-keys -t demo:1 "pnpm --filter claim-web dev" Enter
-# tmux attach-session -t demo
+# Or start individually:
+# pnpm --filter attest-web dev
+# pnpm --filter claim-web dev
 ```
 
 ## Deployment
 
-### GitHub Pages Deployment
+### GitHub Pages Deployment (Recommended)
 
 To deploy the unified frontend to GitHub Pages:
 
@@ -439,7 +426,7 @@ To deploy the unified frontend to GitHub Pages:
 2. **Commit and push**:
    ```bash
    git add docs/
-   git commit -m "Deploy: Update GitHub Pages"
+   git commit -m "Deploy: Update unified-web to GitHub Pages"
    git push origin main
    ```
 
@@ -450,9 +437,9 @@ To deploy the unified frontend to GitHub Pages:
    - Folder: `/docs`
 
 Your unified app will be available at:
-- `https://yourusername.github.io/self-pylon-demo/` (Unified frontend - recommended)
+- `https://yourusername.github.io/self-pylon-demo/` (Unified frontend - complete flow in one app)
 
-**Note**: The build script now builds `unified-web` to the `docs/` root. The legacy `attest-web` and `claim-web` apps are still available in the codebase but are not deployed by default.
+**Note**: Only the unified frontend (`unified-web`) is deployed by default. The legacy separate frontends (`attest-web` and `claim-web`) are deprecated and no longer deployed automatically.
 
 ## Important Notes
 

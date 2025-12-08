@@ -7,6 +7,12 @@ import GradientBackground from '../../components/GradientBackground';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { HumanNFTABI } from '@self-pylon-demo/abis';
+import {
+  cleanRevertMessage,
+  extractErrorMessage,
+  isNullifierUsedError,
+  simulateMint
+} from '../../lib/contractUtils';
 
 export default function SuccessPage() {
   const { address } = useAccount();
@@ -15,6 +21,10 @@ export default function SuccessPage() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
   const publicClient = usePublicClient();
   const [mintStatus, setMintStatus] = useState('');
+  const [isWaitingForReceipt, setIsWaitingForReceipt] = useState(false);
+
+  const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
+  const simulateMintCall = () => simulateMint(publicClient, address as `0x${string}`, nftAddr);
 
   useEffect(() => {
     if (!address) {
@@ -25,18 +35,18 @@ export default function SuccessPage() {
   const handleMintAnother = async () => {
     if (!address) return;
     
+    const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
+    if (!nftAddr || nftAddr === '0x0000000000000000000000000000000000000000') {
+      setMintStatus('Error: HumanNFT contract address not configured');
+      return;
+    }
+    
+    if (!publicClient) {
+      setMintStatus('Error: Public client not available');
+      return;
+    }
+    
     try {
-      const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
-      if (!nftAddr || nftAddr === '0x0000000000000000000000000000000000000000') {
-        setMintStatus('Error: HumanNFT contract address not configured');
-        return;
-      }
-      
-      if (!publicClient) {
-        setMintStatus('Error: Public client not available');
-        return;
-      }
-      
       setMintStatus('Minting...');
       const txHash = await writeContractAsync({
         address: nftAddr,
@@ -46,69 +56,29 @@ export default function SuccessPage() {
       });
       
       setMintStatus(`Submitted: ${txHash}\n⏳ Waiting for confirmation...`);
+      setIsWaitingForReceipt(true);
       
-      // Wait for receipt
       try {
-        const receipt = await publicClient.waitForTransactionReceipt({
-          hash: txHash,
-        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        setIsWaitingForReceipt(false);
         
         if (receipt.status === 'reverted') {
-          // Extract revert reason
-          let revertReason = 'Transaction reverted';
-          try {
-            const tx = await publicClient.getTransaction({ hash: txHash });
-            await publicClient.call({
-              to: tx.to,
-              data: tx.input,
-              account: tx.from,
-              blockNumber: receipt.blockNumber,
-            });
-          } catch (callError: any) {
-            if (callError?.shortMessage) {
-              revertReason = callError.shortMessage;
-              if (revertReason.includes('execution reverted: ')) {
-                revertReason = revertReason.replace('execution reverted: ', '');
-              } else if (revertReason.includes('execution reverted')) {
-                revertReason = revertReason.replace('execution reverted', '').trim();
-              }
-            } else if (callError?.message) {
-              revertReason = callError.message;
-              if (revertReason.includes('execution reverted: ')) {
-                revertReason = revertReason.replace('execution reverted: ', '');
-              } else if (revertReason.includes('execution reverted')) {
-                revertReason = revertReason.replace('execution reverted', '').trim();
-              }
-            } else if (callError?.cause?.reason) {
-              revertReason = callError.cause.reason;
-            }
-          }
+          const revertReason = await simulateMintCall() ?? 'Transaction reverted';
           
-          if (revertReason.includes('Nullifier already used') || revertReason.includes('already been used')) {
+          if (isNullifierUsedError(revertReason)) {
             router.push('/fail');
           } else {
             setMintStatus(`Submitted: ${txHash}\n❌ ${revertReason}`);
           }
         } else {
-          // Success - but this shouldn't happen if nullifier is already used
-          router.push('/success');
+          // Mint succeeded - show success message (we're already on /success page)
+          setMintStatus(`✅ NFT minted successfully!\nTransaction: ${txHash}`);
         }
       } catch (e: any) {
-        console.error('Error waiting for receipt:', e);
-        let errorMessage = 'Transaction reverted';
+        setIsWaitingForReceipt(false);
+        const errorMessage = cleanRevertMessage(extractErrorMessage(e));
         
-        if (e?.shortMessage) {
-          errorMessage = e.shortMessage;
-        } else if (e?.message) {
-          errorMessage = e.message;
-          if (errorMessage.includes('execution reverted: ')) {
-            errorMessage = errorMessage.replace('execution reverted: ', '');
-          }
-        } else if (e?.cause?.reason) {
-          errorMessage = e.cause.reason;
-        }
-        
-        if (errorMessage.includes('Nullifier already used') || errorMessage.includes('already been used')) {
+        if (isNullifierUsedError(errorMessage)) {
           router.push('/fail');
         } else {
           setMintStatus(`Submitted: ${txHash}\n❌ ${errorMessage}`);
@@ -116,121 +86,13 @@ export default function SuccessPage() {
       }
     } catch (e: any) {
       console.error('Mint error:', e);
+      setIsWaitingForReceipt(false);
       
-      // Check if this is a "User rejected" error - might be masking a revert
-      const isUserRejected = 
-        e?.shortMessage?.includes('User rejected') ||
-        e?.message?.includes('User rejected') ||
-        e?.cause?.message?.includes('User rejected') ||
-        e?.name === 'UserRejectedRequestError';
+      // Try to get the actual revert reason via simulation
+      const revertReason = await simulateMintCall();
+      const errorMessage = revertReason ?? cleanRevertMessage(extractErrorMessage(e));
       
-      let errorMessage = 'Transaction failed';
-      const error = e;
-      
-      // Always try to call the contract to get the actual revert reason
-      // This works for both "User rejected" errors (which might mask reverts) and other errors
-      // Create a separate client like we do for verification check (to avoid CORS issues)
-      if (address) {
-        try {
-          const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
-          if (nftAddr && nftAddr !== '0x0000000000000000000000000000000000000000') {
-            // Create a client to call the contract (same approach as verification check)
-            const { createPublicClient, http, encodeFunctionData } = await import('viem');
-            const pylonClient = createPublicClient({
-              transport: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''),
-              chain: {
-                id: Number(process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 2139),
-                name: 'Pylon',
-                nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-                rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''] } }
-              }
-            });
-            
-            const data = encodeFunctionData({
-              abi: HumanNFTABI,
-              functionName: 'mint',
-              args: []
-            });
-            
-            // Call the contract to check if it would revert (using separate client like verification check)
-            await pylonClient.call({
-              to: nftAddr,
-              data: data as `0x${string}`,
-              account: address as `0x${string}`
-            });
-            // If call succeeds and it was a user rejection, it's a genuine user rejection
-            if (isUserRejected) {
-              errorMessage = 'Transaction was rejected by user';
-            } else {
-              // Call succeeded but we got an error - use the original error message
-              if (error?.shortMessage) {
-                errorMessage = error.shortMessage;
-                if (errorMessage.includes('execution reverted: ')) {
-                  errorMessage = errorMessage.replace('execution reverted: ', '');
-                }
-              } else if (error?.message) {
-                errorMessage = error.message;
-                if (errorMessage.includes('execution reverted: ')) {
-                  errorMessage = errorMessage.replace('execution reverted: ', '');
-                }
-              } else if (error?.cause?.data) {
-                errorMessage = `Transaction failed: ${error.cause.data}`;
-              } else if (error?.cause?.reason) {
-                errorMessage = `Transaction failed: ${error.cause.reason}`;
-              } else if (error?.data?.message) {
-                errorMessage = error.data.message;
-              }
-            }
-          }
-        } catch (callError: any) {
-          // Call failed - extract the actual revert reason (this is the real error)
-          console.log('Call error (this is the real revert reason):', callError);
-          
-          if (callError?.shortMessage) {
-            errorMessage = callError.shortMessage;
-            if (errorMessage.includes('execution reverted: ')) {
-              errorMessage = errorMessage.replace('execution reverted: ', '');
-            } else if (errorMessage.includes('execution reverted')) {
-              errorMessage = errorMessage.replace('execution reverted', '').trim();
-            }
-          } else if (callError?.message) {
-            errorMessage = callError.message;
-            if (errorMessage.includes('execution reverted: ')) {
-              errorMessage = errorMessage.replace('execution reverted: ', '');
-            } else if (errorMessage.includes('execution reverted')) {
-              errorMessage = errorMessage.replace('execution reverted', '').trim();
-            }
-          } else if (callError?.cause?.reason) {
-            errorMessage = callError.cause.reason;
-          } else if (callError?.cause?.data) {
-            errorMessage = `Revert data: ${callError.cause.data}`;
-          }
-        }
-      } else {
-        // Fallback to extracting from original error if we can't make the call
-        if (error?.shortMessage) {
-          errorMessage = error.shortMessage;
-          if (errorMessage.includes('execution reverted: ')) {
-            errorMessage = errorMessage.replace('execution reverted: ', '');
-          }
-        } else if (error?.message) {
-          errorMessage = error.message;
-          if (errorMessage.includes('execution reverted: ')) {
-            errorMessage = errorMessage.replace('execution reverted: ', '');
-          }
-        } else if (error?.cause?.data) {
-          errorMessage = `Transaction failed: ${error.cause.data}`;
-        } else if (error?.cause?.reason) {
-          errorMessage = `Transaction failed: ${error.cause.reason}`;
-        } else if (error?.data?.message) {
-          errorMessage = error.data.message;
-        }
-      }
-      
-      // Check for nullifier already used errors
-      if (errorMessage.includes('Nullifier already used') || 
-          errorMessage.includes('already been used') ||
-          (errorMessage.toLowerCase().includes('nullifier') && errorMessage.toLowerCase().includes('used'))) {
+      if (isNullifierUsedError(errorMessage)) {
         router.push('/fail');
       } else {
         setMintStatus(`❌ ${errorMessage}`);
@@ -309,7 +171,7 @@ export default function SuccessPage() {
                 
                 <Button
                   onClick={handleMintAnother}
-                  disabled={isWritePending}
+                  disabled={isWritePending || isWaitingForReceipt}
                   size="lg"
                   className="w-full max-w-md mx-auto"
                   style={{
@@ -325,11 +187,11 @@ export default function SuccessPage() {
                     color: '#FFFFFF',
                     borderRadius: '4px',
                     padding: '16px 18px',
-                    opacity: isWritePending ? 0.7 : 1,
-                    cursor: isWritePending ? 'not-allowed' : 'pointer'
+                    opacity: (isWritePending || isWaitingForReceipt) ? 0.7 : 1,
+                    cursor: (isWritePending || isWaitingForReceipt) ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {isWritePending ? 'Minting...' : 'Try to mint another to see Human NFT\'s Sybil resistance in action'}
+                  {isWritePending ? 'Minting...' : isWaitingForReceipt ? 'Waiting for confirmation...' : 'Try to mint another to see Human NFT\'s Sybil resistance in action'}
                 </Button>
                 {mintStatus && (
                   <div style={{ 

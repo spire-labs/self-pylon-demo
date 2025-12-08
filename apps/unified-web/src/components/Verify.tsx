@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAccount, useWriteContract, useSwitchChain, usePublicClient, useDisconnect } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -9,6 +9,15 @@ import errorStyles from './VerifyErrorCard.module.css';
 import buttonStyles from './ui/Button.module.css';
 import { pylon } from '../chains/pylon';
 import { HumanNFTABI } from '@self-pylon-demo/abis';
+import {
+  extractErrorMessage,
+  cleanRevertMessage,
+  isRpcError,
+  isUserRejection,
+  extractRevertReason,
+  isNullifierUsedError,
+  simulateMint
+} from '../lib/contractUtils';
 
 type VerifyState = 'step1' | 'success' | 'error';
 
@@ -36,6 +45,8 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
   // Check verification status function - called manually when user clicks button
   // Use HumanNFT contract on Pylon to check verification (via SettlementForwardingProxy)
   // This uses the same mechanism as mint() and reads from Celo synchronously through Pylon
+  // Uses wallet provider through wagmi abstraction to avoid CORS issues
+  // NOTE: This function assumes we're already on Pylon (chain switching happens in handleVerify)
   const checkVerification = async () => {
     if (!effectiveAddress) return;
 
@@ -43,22 +54,14 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
     setMintStatus('Checking verification status...');
     
     try {
-      const { createPublicClient, http } = await import('viem');
-      const pylonClient = createPublicClient({
-        transport: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''),
-        chain: {
-          id: Number(process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 2139),
-          name: 'Pylon',
-          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-          rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''] } }
-        }
-      });
-
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+      
       const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
       if (nftAddr && nftAddr !== '0x0000000000000000000000000000000000000000') {
-        // Use HumanNFT's getNullifierForAddress - returns 0 if not verified, non-zero if verified
-        // This internally calls ProofOfHuman through SettlementForwardingProxy on Pylon
-        const nullifier = await pylonClient.readContract({
+        // Use wagmi's publicClient (configured to use wallet provider, avoiding CORS)
+        const nullifier = await publicClient.readContract({
           address: nftAddr,
           abi: HumanNFTABI,
           functionName: 'getNullifierForAddress',
@@ -79,21 +82,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
       }
     } catch (error: any) {
       console.error('Error checking verification:', error);
-      // Extract error message for display
-      let errorMessage = 'Error checking verification status';
-      if (error?.shortMessage) {
-        errorMessage = error.shortMessage;
-        if (errorMessage.includes('execution reverted: ')) {
-          errorMessage = errorMessage.replace('execution reverted: ', '');
-        }
-      } else if (error?.message) {
-        errorMessage = error.message;
-        if (errorMessage.includes('execution reverted: ')) {
-          errorMessage = errorMessage.replace('execution reverted: ', '');
-        }
-      } else if (error?.cause?.reason) {
-        errorMessage = error.cause.reason;
-      }
+      const errorMessage = cleanRevertMessage(extractErrorMessage(error)) || 'Error checking verification status';
       setMintStatus(errorMessage);
       setState('error');
     } finally {
@@ -101,67 +90,61 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
     }
   };
 
-  // Auto-switch to Pylon when on success state
-  useEffect(() => {
-    if (state === 'success' && chainId && chainId !== pylon.id) {
-      switchChain({ chainId: pylon.id });
-    }
-  }, [state, chainId, switchChain]);
-
   const handleVerify = async () => {
-    // Check verification status when user clicks the button
+    // Switch to Pylon first if needed, then check verification
+    // We need to be on Pylon to query the HumanNFT contract
+    if (chainId && chainId !== pylon.id) {
+      try {
+        await switchChain({ chainId: pylon.id });
+        // Wait a moment for the chain switch to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Failed to switch to Pylon:', error);
+        setMintStatus('Please switch to Human Appchain to verify your humanity');
+        setState('error');
+        return;
+      }
+    }
+    
+    // Check verification status after ensuring we're on Pylon
     await checkVerification();
   };
 
+  // Helper to call simulateMint with current context
+  const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
+  const simulateMintCall = () => simulateMint(publicClient, effectiveAddress as `0x${string}`, nftAddr);
+
   const waitForReceipt = async (txHash: `0x${string}`) => {
-    if (!publicClient) return;
+    if (!publicClient || !effectiveAddress) return;
     
     setIsWaitingForReceipt(true);
     try {
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash: txHash,
-      });
+      // Wait for receipt with timeout (5 seconds)
+      // waitForTransactionReceipt will poll for the transaction, so we don't need to check if it exists first
+      const receipt = await Promise.race([
+        publicClient.waitForTransactionReceipt({
+          hash: txHash,
+        }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Transaction receipt timeout - transaction may have been dropped or reverted'));
+          }, 5000); // 5 second timeout
+        })
+      ]);
       
       if (receipt.status === 'reverted') {
-        // Get the transaction to retrieve revert reason via static call at the exact block
         let revertReason = 'Transaction reverted';
         try {
-          const tx = await publicClient.getTransaction({ hash: txHash });
-          // Static call at the exact block - read-only, uses exact same state and inputs
-          // This is deterministic and gives us the revert reason from the actual failed transaction
-          await publicClient.call({
-            to: tx.to,
-            data: tx.input,
-            account: tx.from,
-            blockNumber: receipt.blockNumber,
-          });
-          // Should not reach here if transaction reverted
-        } catch (callError: any) {
-          // Extract revert reason from the call error - this is the actual revert message
-          if (callError?.shortMessage) {
-            revertReason = callError.shortMessage;
-            // Clean up common prefixes
-            if (revertReason.includes('execution reverted: ')) {
-              revertReason = revertReason.replace('execution reverted: ', '');
-            } else if (revertReason.includes('execution reverted')) {
-              revertReason = revertReason.replace('execution reverted', '').trim();
-            }
-          } else if (callError?.message) {
-            revertReason = callError.message;
-            if (revertReason.includes('execution reverted: ')) {
-              revertReason = revertReason.replace('execution reverted: ', '');
-            } else if (revertReason.includes('execution reverted')) {
-              revertReason = revertReason.replace('execution reverted', '').trim();
-            }
-          } else if (callError?.cause?.reason) {
-            revertReason = callError.cause.reason;
-          } else if (callError?.cause?.data) {
-            // Try to decode if it's ABI-encoded revert data
-            revertReason = `Revert data: ${callError.cause.data}`;
+          // Try to simulate the mint call to get revert reason
+          const simulatedRevert = await simulateMintCall();
+          if (simulatedRevert) {
+            revertReason = simulatedRevert;
           }
+        } catch (callError: any) {
+          revertReason = extractRevertReason(callError) ?? revertReason;
         }
         
-        if (revertReason.includes('Nullifier already used') || revertReason.includes('already been used')) {
+        if (isNullifierUsedError(revertReason)) {
           setIsWaitingForReceipt(false);
           router.push('/fail');
         } else {
@@ -179,17 +162,23 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
       }
     } catch (e: any) {
       console.error('Error waiting for receipt:', e);
-      let errorMessage = 'Transaction reverted';
+      const isTimeout = e?.message?.includes('timeout') || e?.message?.includes('dropped');
+      let errorMessage = cleanRevertMessage(extractErrorMessage(e));
       
-      if (e?.shortMessage) {
-        errorMessage = e.shortMessage;
-      } else if (e?.message) {
-        errorMessage = e.message;
-        if (errorMessage.includes('execution reverted: ')) {
-          errorMessage = errorMessage.replace('execution reverted: ', '');
+      if (isRpcError(e) || isTimeout) {
+        const revertReason = await simulateMintCall();
+        if (revertReason) {
+          errorMessage = revertReason;
+          if (isNullifierUsedError(errorMessage)) {
+            setIsWaitingForReceipt(false);
+            router.push('/fail');
+            return;
+          }
+        } else {
+          errorMessage = isTimeout
+            ? 'Transaction timed out or was dropped. Please try again.'
+            : 'Transaction was rejected by the network. Please try again.';
         }
-      } else if (e?.cause?.reason) {
-        errorMessage = e.cause.reason;
       }
       
       setMintStatus(`Submitted: ${txHash}\n❌ ${errorMessage}`);
@@ -214,7 +203,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
         setState('error');
         return;
       }
-      
+
       setMintStatus('Minting...');
       const txHash = await writeContractAsync({
         address: nftAddr,
@@ -228,154 +217,22 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
     } catch (e: any) {
       console.error('Mint error:', e);
       
-      // Check if this is a "User rejected" error - might be masking a revert
-      const isUserRejected = 
-        e?.shortMessage?.includes('User rejected') ||
-        e?.message?.includes('User rejected') ||
-        e?.cause?.message?.includes('User rejected') ||
-        e?.name === 'UserRejectedRequestError';
+      const userRejected = isUserRejection(e);
+      let errorMessage = cleanRevertMessage(extractErrorMessage(e));
       
-      let errorMessage = 'Transaction failed';
-      const error = e;
-      
-      // Always try to call the contract to get the actual revert reason
-      // This works for both "User rejected" errors (which might mask reverts) and other errors
-      // Create a separate client like we do for verification check (to avoid CORS issues)
-      if (effectiveAddress) {
-        try {
-          const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
-          if (nftAddr && nftAddr !== '0x0000000000000000000000000000000000000000') {
-            // Create a client to call the contract (same approach as verification check)
-            const { createPublicClient, http, encodeFunctionData } = await import('viem');
-            const pylonClient = createPublicClient({
-              transport: http(process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''),
-              chain: {
-                id: Number(process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 2139),
-                name: 'Pylon',
-                nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-                rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_PYLON_RPC_URL || ''] } }
-              }
-            });
-            
-            const data = encodeFunctionData({
-              abi: HumanNFTABI,
-              functionName: 'mint',
-              args: []
-            });
-            
-            // Call the contract to check if it would revert (using separate client like verification check)
-            await pylonClient.call({
-              to: nftAddr,
-              data: data as `0x${string}`,
-              account: effectiveAddress as `0x${string}`
-            });
-            // If call succeeds and it was a user rejection, it's a genuine user rejection
-            if (isUserRejected) {
-              errorMessage = 'Transaction was rejected by user';
-            } else {
-              // Call succeeded but we got an error - use the original error message
-              if (error?.shortMessage) {
-                errorMessage = error.shortMessage;
-                if (errorMessage.includes('execution reverted: ')) {
-                  errorMessage = errorMessage.replace('execution reverted: ', '');
-                }
-              } else if (error?.message) {
-                errorMessage = error.message;
-                if (errorMessage.includes('execution reverted: ')) {
-                  errorMessage = errorMessage.replace('execution reverted: ', '');
-                }
-              } else if (error?.cause?.data) {
-                errorMessage = `Transaction failed: ${error.cause.data}`;
-              } else if (error?.cause?.reason) {
-                errorMessage = `Transaction failed: ${error.cause.reason}`;
-              } else if (error?.data?.message) {
-                errorMessage = error.data.message;
-              }
-            }
-          }
-        } catch (callError: any) {
-          // Call failed - extract the actual revert reason (this is the real error)
-          console.error('[Mint Error Extraction] Call failed:', callError);
-          console.error('[Mint Error Extraction] Error details:', {
-            shortMessage: callError?.shortMessage,
-            message: callError?.message,
-            cause: callError?.cause,
-            name: callError?.name,
-            stack: callError?.stack
-          });
-          
-          // Check if this is a CORS/network error vs a contract revert
-          const isNetworkError = 
-            callError?.message?.includes('CORS') ||
-            callError?.message?.includes('Failed to fetch') ||
-            callError?.message?.includes('NetworkError') ||
-            callError?.name === 'TypeError';
-          
-          if (isNetworkError) {
-            console.warn('[Mint Error Extraction] Network/CORS error detected, falling back to original error message');
-            // If it's a network error, use the original error message instead
-            if (error?.shortMessage) {
-              errorMessage = error.shortMessage;
-              if (errorMessage.includes('execution reverted: ')) {
-                errorMessage = errorMessage.replace('execution reverted: ', '');
-              }
-            } else if (error?.message) {
-              errorMessage = error.message;
-              if (errorMessage.includes('execution reverted: ')) {
-                errorMessage = errorMessage.replace('execution reverted: ', '');
-              }
-            } else if (error?.cause?.data) {
-              errorMessage = `Transaction failed: ${error.cause.data}`;
-            } else if (error?.cause?.reason) {
-              errorMessage = `Transaction failed: ${error.cause.reason}`;
-            } else if (error?.data?.message) {
-              errorMessage = error.data.message;
-            }
-          } else if (callError?.shortMessage) {
-            errorMessage = callError.shortMessage;
-            if (errorMessage.includes('execution reverted: ')) {
-              errorMessage = errorMessage.replace('execution reverted: ', '');
-            } else if (errorMessage.includes('execution reverted')) {
-              errorMessage = errorMessage.replace('execution reverted', '').trim();
-            }
-          } else if (callError?.message) {
-            errorMessage = callError.message;
-            if (errorMessage.includes('execution reverted: ')) {
-              errorMessage = errorMessage.replace('execution reverted: ', '');
-            } else if (errorMessage.includes('execution reverted')) {
-              errorMessage = errorMessage.replace('execution reverted', '').trim();
-            }
-          } else if (callError?.cause?.reason) {
-            errorMessage = callError.cause.reason;
-          } else if (callError?.cause?.data) {
-            errorMessage = `Revert data: ${callError.cause.data}`;
-          }
-        }
-      } else {
-        // Fallback to extracting from original error if we can't make the call
-        if (error?.shortMessage) {
-          errorMessage = error.shortMessage;
-          if (errorMessage.includes('execution reverted: ')) {
-            errorMessage = errorMessage.replace('execution reverted: ', '');
-          }
-        } else if (error?.message) {
-          errorMessage = error.message;
-          if (errorMessage.includes('execution reverted: ')) {
-            errorMessage = errorMessage.replace('execution reverted: ', '');
-          }
-        } else if (error?.cause?.data) {
-          errorMessage = `Transaction failed: ${error.cause.data}`;
-        } else if (error?.cause?.reason) {
-          errorMessage = `Transaction failed: ${error.cause.reason}`;
-        } else if (error?.data?.message) {
-          errorMessage = error.data.message;
+      // Try eth_call to check if transaction would revert (even for "user rejections")
+      const hasRevertInfo = errorMessage.includes('execution reverted') || errorMessage.includes('revert');
+      if (!hasRevertInfo) {
+        const revertReason = await simulateMintCall();
+        if (revertReason) {
+          errorMessage = revertReason;
+        } else if (userRejected) {
+          errorMessage = 'Transaction was rejected by user';
         }
       }
       
       // Check for nullifier already used errors
-      if (errorMessage.includes('Nullifier already used') || 
-          errorMessage.includes('already been used') ||
-          (errorMessage.toLowerCase().includes('nullifier') && errorMessage.toLowerCase().includes('used'))) {
+      if (isNullifierUsedError(errorMessage)) {
         router.push('/fail');
       } else {
         setMintStatus(`❌ ${errorMessage}`);

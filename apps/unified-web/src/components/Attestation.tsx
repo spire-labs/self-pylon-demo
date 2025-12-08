@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useAccount, useSignMessage, usePublicClient, useSwitchChain } from 'wagmi';
 import { useRouter } from 'next/navigation';
+import { celo } from '../chains/celo';
 import Image from 'next/image';
 import stepOneStyles from './StepOneCard.module.css';
 import stepTwoStyles from './StepTwoQRCard.module.css';
@@ -19,8 +20,10 @@ interface AttestationProps {
 }
 
 export default function Attestation({ address, onSuccess, initialState }: AttestationProps) {
-  const { address: connectedAddress } = useAccount();
+  const { address: connectedAddress, chainId } = useAccount();
   const { signMessageAsync, isPending: isSigning } = useSignMessage();
+  const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   const router = useRouter();
   const [state, setState] = useState<AttestationState>(initialState || 'step1');
   const [signature, setSignature] = useState<string>('');
@@ -55,21 +58,24 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
       const maxPolls = 20; // Poll for up to 60 seconds (20 * 3s)
       
       const checkVerification = async () => {
+        // Ensure we're on Celo before making the call
+        if (chainId && chainId !== celo.id) {
+          try {
+            await switchChain({ chainId: celo.id });
+            // Wait a moment for the chain switch to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (error) {
+            console.error('[Attestation] Failed to switch to Celo:', error);
+            setState('error');
+            return;
+          }
+        }
+        
         try {
-          const { createPublicClient, http } = await import('viem');
-          const celoClient = createPublicClient({
-            transport: http(process.env.NEXT_PUBLIC_CELO_RPC_URL || ''),
-            chain: {
-              id: Number(process.env.NEXT_PUBLIC_CELO_CHAIN_ID || 42220),
-              name: 'Celo',
-              nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-              rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_CELO_RPC_URL || ''] } }
-            }
-          });
-
           const proofOfHumanAddr = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS as `0x${string}`;
-          if (proofOfHumanAddr) {
-            const verified = await celoClient.readContract({
+          if (proofOfHumanAddr && publicClient) {
+            // Use wagmi's publicClient (configured to use wallet provider, avoiding CORS)
+            const verified = await publicClient.readContract({
               address: proofOfHumanAddr,
               abi: [{ 
                 name: 'isVerified', 
@@ -116,7 +122,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
       const interval = setInterval(checkVerification, 3000);
       return () => clearInterval(interval);
     }
-  }, [shouldPoll, state, effectiveAddress, onSuccess]);
+  }, [shouldPoll, state, effectiveAddress, onSuccess, publicClient, chainId, switchChain]);
 
   const generateSignature = async () => {
     if (!effectiveAddress) return;

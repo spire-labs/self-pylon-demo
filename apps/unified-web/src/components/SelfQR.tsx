@@ -1,7 +1,8 @@
 "use client";
 import dynamic from 'next/dynamic';
 import { useMemo, useState, useEffect } from 'react';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useAccount, useSignMessage, usePublicClient, useSwitchChain } from 'wagmi';
+import { celo } from '../chains/celo';
 import { fromSuccessEvent } from '@self-pylon-demo/self-adapter';
 
 // Import Self QR components (package must be installed in the app workspace)
@@ -15,8 +16,10 @@ type Props = {
 };
 
 function Inner({ address, onProofVerified }: Props) {
-  const { address: connectedAddress } = useAccount();
+  const { address: connectedAddress, chainId } = useAccount();
   const { signMessageAsync, isPending: isSigning } = useSignMessage();
+  const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
   const [status, setStatus] = useState<string>('Scan QR code with Self app');
   const [proofData, setProofData] = useState<any>(null);
   const [signature, setSignature] = useState<string>('');
@@ -196,19 +199,20 @@ function Inner({ address, onProofVerified }: Props) {
       return;
     }
 
-    try {
-      // Create a client to read from the contract
-      const { createPublicClient, http } = await import('viem');
-      const celoClient = createPublicClient({
-        transport: http(process.env.NEXT_PUBLIC_CELO_RPC_URL || ''),
-        chain: {
-          id: Number(process.env.NEXT_PUBLIC_CELO_CHAIN_ID || 42220),
-          name: 'Celo L2',
-          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
-          rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_CELO_RPC_URL || ''] } }
-        }
-      });
+    // Ensure we're on Celo before making the call
+    if (chainId && chainId !== celo.id) {
+      try {
+        await switchChain({ chainId: celo.id });
+        // Wait a moment for the chain switch to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('[SelfQR] Failed to switch to Celo:', error);
+        setStatus('❌ Please switch to Celo network to check verification status');
+        return;
+      }
+    }
 
+    try {
       const proofOfHumanAddr = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS as `0x${string}`;
       
       if (proofOfHumanAddr && proofOfHumanAddr !== '0x0000000000000000000000000000000000000000') {
@@ -216,8 +220,12 @@ function Inner({ address, onProofVerified }: Props) {
         console.log('[SelfQR] ProofOfHuman contract address:', proofOfHumanAddr);
         
         try {
-          // Check if the user is verified using the isVerified function
-          const isVerified = await celoClient.readContract({
+          if (!publicClient) {
+            throw new Error('Public client not available');
+          }
+          
+          // Use wagmi's publicClient
+          const isVerified = await publicClient.readContract({
             address: proofOfHumanAddr,
             abi: [{ 
               name: 'isVerified', 
@@ -241,12 +249,20 @@ function Inner({ address, onProofVerified }: Props) {
         } catch (contractError: any) {
           console.error('[SelfQR] Contract call error:', contractError);
           
-          // Check if the contract exists and has code
-          const code = await celoClient.getBytecode({ address: proofOfHumanAddr });
-          if (!code || code === '0x') {
-            setStatus('❌ Contract not deployed at this address. Please check your configuration.');
-          } else {
-            setStatus(`❌ Contract call failed: ${contractError.message || 'Unknown error'}. The contract might not be properly initialized.`);
+          // Check if the contract exists and has code using wagmi's publicClient
+          try {
+            if (publicClient) {
+              const code = await publicClient.getBytecode({ address: proofOfHumanAddr });
+              if (!code || code === '0x') {
+                setStatus('❌ Contract not deployed at this address. Please check your configuration.');
+              } else {
+                setStatus(`❌ Contract call failed: ${contractError.message || 'Unknown error'}. The contract might not be properly initialized.`);
+              }
+            } else {
+              setStatus(`❌ Contract call failed: ${contractError.message || 'Unknown error'}.`);
+            }
+          } catch (codeError) {
+            setStatus(`❌ Contract call failed: ${contractError.message || 'Unknown error'}.`);
           }
         }
       } else {
