@@ -1,11 +1,13 @@
 /** @type {import('next').NextConfig} */
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/self-pylon-demo';
+
 const nextConfig = {
   reactStrictMode: true,
   output: 'export',
   trailingSlash: true,
   distDir: process.env.OUTPUT_DIR || 'out',
-  basePath: '/self-pylon-demo',
-  assetPrefix: '/self-pylon-demo',
+  basePath,
+  assetPrefix: basePath,
   experimental: {
     typedRoutes: true
   },

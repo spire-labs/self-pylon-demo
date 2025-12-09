@@ -16,7 +16,7 @@ export default function Logo() {
         style={{ width: 36, height: 36.19 }}
       />
       <Image
-        src="logo_spire.svg"
+        src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/logo_spire.svg`}
         alt="logo"
         width={72.54}
         height={28.68}
