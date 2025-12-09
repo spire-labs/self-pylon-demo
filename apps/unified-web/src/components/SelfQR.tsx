@@ -34,6 +34,8 @@ function Inner({ address, onProofVerified }: Props) {
   const [proofData, setProofData] = useState<any>(null);
   const [signature, setSignature] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
+  const [useDeeplink, setUseDeeplink] = useState(false);
+  const effectiveSignature = signature;
 
   // Detect mobile early for UX hints (no SSR)
   useEffect(() => {
@@ -301,8 +303,22 @@ function Inner({ address, onProofVerified }: Props) {
     }
   };
 
-  // Use signature from state (loaded from localStorage in useEffect)
-  const effectiveSignature = signature;
+  // When returning from Self app (deeplink flow), re-check verification as a safety net
+  useEffect(() => {
+    if (!useDeeplink) return;
+    const handler = () => {
+      // Only re-check if we have a signature and a built selfApp
+      if (effectiveSignature && selfApp) {
+        checkVerificationStatus();
+      }
+    };
+    window.addEventListener('visibilitychange', handler);
+    window.addEventListener('focus', handler);
+    return () => {
+      window.removeEventListener('visibilitychange', handler);
+      window.removeEventListener('focus', handler);
+    };
+  }, [useDeeplink, effectiveSignature, selfApp]);
 
   return (
     <div>
@@ -333,6 +349,7 @@ function Inner({ address, onProofVerified }: Props) {
                 href={universalLink}
                 target="_blank"
                 rel="noreferrer"
+                onClick={() => setUseDeeplink(true)}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -355,10 +372,11 @@ function Inner({ address, onProofVerified }: Props) {
           )}
           <SelfQRcodeWrapper
             selfApp={selfApp}
+            type="websocket"
             onSuccess={() => {
+              // Works for both websocket (QR) and deeplink (button) flows
               console.log('Self success event received');
               setStatus('Self verification completed! Checking on-chain status...');
-              // Check verification status on-chain
               checkVerificationStatus();
             }}
             onError={(error: any) => {
@@ -366,6 +384,23 @@ function Inner({ address, onProofVerified }: Props) {
               setStatus(`Error: ${error.message || 'Unknown error'}`);
             }}
           />
+          {useDeeplink && (
+            <div style={{ display: 'none' }}>
+              <SelfQRcodeWrapper
+                selfApp={selfApp}
+                type="deeplink"
+                onSuccess={() => {
+                  console.log('Self deeplink success event received');
+                  setStatus('Self verification completed! Checking on-chain status...');
+                  checkVerificationStatus();
+                }}
+                onError={(error: any) => {
+                  console.error('Self deeplink error:', error);
+                  setStatus(`Error: ${error.message || 'Unknown error'}`);
+                }}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ 
