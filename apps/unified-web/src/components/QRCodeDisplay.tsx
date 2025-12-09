@@ -52,7 +52,7 @@ function QRCodeDisplayInner({ address, signature, onProofVerified }: QRCodeDispl
         aria-label="Download Self app"
       >
         <Image
-          src="/attestation/self-logo.svg"
+          src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/attestation/self-logo.svg`}
           alt="self-logo"
           width={192}
           height={72}

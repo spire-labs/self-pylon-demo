@@ -200,7 +200,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
           <div className={stepTwoStyles.successBanner}>
             <div className={stepTwoStyles.successTitle}>
               <Image
-                src="/verify/check_success.svg"
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_fail.svg`}
                 alt="check"
                 width={9.4}
                 height={10.3}
@@ -251,7 +251,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
         <section className={successStyles.cardBorder}>
           <div className={successStyles.cardSection}>
             <Image
-              src="/verify/check_success.svg"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_success.svg`}
               alt="check"
               width={25.08}
               height={27.58}
@@ -292,7 +292,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
         <div className={errorStyles.successBanner}>
           <div className={errorStyles.successTitle}>
             <Image
-              src="/verify/check_success.svg"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_success.svg`}
               alt="check"
               width={9.4}
               height={10.3}
@@ -316,7 +316,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
         <div className={errorStyles.errorPadding}>
           <div className={errorStyles.alertHeader}>
             <Image
-              src="/verify/check_fail.svg"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_fail.svg`}
               alt="error"
               width={10.18}
               height={10.18}

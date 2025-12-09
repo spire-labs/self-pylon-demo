@@ -265,7 +265,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
         <div className={stepOneStyles.cardBorder}>
           <div className={stepOneStyles.cardSection}>
             <Image
-              src="/verify/check.svg"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check.svg`}
               alt="check"
               width={25.08}
               height={27.58}
@@ -331,7 +331,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
         <section className={successStyles.cardBorder}>
           <div className={successStyles.cardSection}>
             <Image
-              src="/verify/check_success.svg"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_success.svg`}
               alt="check"
               width={25.08}
               height={27.58}
@@ -414,7 +414,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
         <div className={errorStyles.alertBlock}>
           <div className={errorStyles.alertHeader}>
             <Image
-              src="/verify/check_fail.svg"
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_fail.svg`}
               alt="error"
               width={10.18}
               height={10.18}
