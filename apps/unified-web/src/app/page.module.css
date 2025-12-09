@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: center;
   gap: 32px;
-  background: url("/main/mountains.svg") no-repeat center/cover,
+  background: url("/self-pylon-demo/main/mountains.svg") no-repeat center/cover,
   linear-gradient(
     178.54deg,
     rgba(255, 213, 224, 0) 8.52%,
@@ -57,7 +57,7 @@
 
 @media (max-width: 767px) {
   .container {
-    background: url("/main/mountains_mobile.svg") no-repeat center/cover,
+    background: url("/self-pylon-demo/main/mountains_mobile.svg") no-repeat center/cover,
     linear-gradient(
       178.54deg,
       rgba(255, 213, 224, 0) 8.52%,

@@ -27,7 +27,7 @@
 
 .topText {
   padding: 16px;
-  background: url("/mint/diamond.svg") center/cover no-repeat;
+  background: url("/self-pylon-demo/mint/diamond.svg") center/cover no-repeat;
   width: 480px;
   height: 400px;
 }
@@ -35,7 +35,7 @@
 .imageBlock {
   width: 480px;
   height: 400px;
-  background: url("/mint/diamond.svg") center/cover no-repeat;
+  background: url("/self-pylon-demo/mint/diamond.svg") center/cover no-repeat;
   margin: 0 auto;
   border: 1px solid #d0d0d0;
 }
@@ -44,7 +44,7 @@
 
 .cardTop {
   padding: 32px 32px 240px;
-  background: url("/mint/diamond.svg") bottom right/contain no-repeat;
+  background: url("/self-pylon-demo/mint/diamond.svg") bottom right/contain no-repeat;
 }
 
 .textBlock {
