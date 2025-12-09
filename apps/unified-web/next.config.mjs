@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '/self-pylon-demo';
+const basePath = '/self-pylon-demo';
 
 const nextConfig = {
   reactStrictMode: true,
