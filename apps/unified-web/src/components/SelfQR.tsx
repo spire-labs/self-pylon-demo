@@ -342,19 +342,77 @@ function Inner({ address, onProofVerified }: Props) {
     };
   }, [useDeeplink, effectiveSignature, selfApp]);
 
-  // Poll as a fallback while deeplink flow is active (helps if events are missed)
+  // Primary mechanism: Poll for verification status when deeplink flow is active
+  // This starts when user clicks "Open in Self app" and continues until verified
   useEffect(() => {
-    if (!useDeeplink || !effectiveSignature || !selfApp) return;
-    const interval = setInterval(() => {
-      checkVerificationStatus();
-    }, 5000);
-    // Allow plenty of time for first-time users to download/setup Self and attest
-    const timeout = setTimeout(() => clearInterval(interval), 15 * 60 * 1000); // 15 minutes
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
+    if (!useDeeplink || !effectiveSignature || !selfApp || !address) return;
+    
+    let interval: NodeJS.Timeout | null = null;
+    let isCleanedUp = false;
+    
+    const pollVerification = async () => {
+      if (isCleanedUp) return;
+      
+      try {
+        // Ensure we're on Celo before checking
+        if (chainId && chainId !== celo.id) {
+          try {
+            await switchChain({ chainId: celo.id });
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (error) {
+            console.error('[SelfQR] Failed to switch to Celo for polling:', error);
+            return;
+          }
+        }
+        
+        if (!publicClient) return;
+        
+        const proofOfHumanAddr = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS as `0x${string}`;
+        if (!proofOfHumanAddr || proofOfHumanAddr === '0x0000000000000000000000000000000000000000') {
+          return;
+        }
+        
+        const verified = await publicClient.readContract({
+          address: proofOfHumanAddr,
+          abi: [{ 
+            name: 'isVerified', 
+            type: 'function', 
+            inputs: [{ name: 'user', type: 'address' }], 
+            outputs: [{ name: '', type: 'bool' }], 
+            stateMutability: 'view' 
+          }],
+          functionName: 'isVerified',
+          args: [address as `0x${string}`]
+        });
+        
+        if (verified) {
+          // Success! Stop polling and notify
+          console.log('[SelfQR] Verification detected via polling!');
+          setStatus('✅ Verification successful! You are now attested as human on-chain.');
+          setProofData({ verified: true, address });
+          if (onProofVerified) {
+            onProofVerified();
+          }
+          // Clean up polling
+          if (interval) clearInterval(interval);
+          interval = null;
+        }
+      } catch (error) {
+        console.error('[SelfQR] Error during verification polling:', error);
+        // Continue polling on error (might be transient)
+      }
     };
-  }, [useDeeplink, effectiveSignature, selfApp]);
+    
+    // Start polling immediately, then every 5 seconds
+    pollVerification();
+    interval = setInterval(pollVerification, 5000);
+    
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      isCleanedUp = true;
+      if (interval) clearInterval(interval);
+    };
+  }, [useDeeplink, effectiveSignature, selfApp, address, chainId, switchChain, publicClient, onProofVerified]);
 
   return (
     <div>
@@ -378,8 +436,7 @@ function Inner({ address, onProofVerified }: Props) {
             >
               <div style={{ fontWeight: 700, marginBottom: 6 }}>Mobile detected</div>
               <div style={{ opacity: 0.85, marginBottom: 8 }}>
-                Tap the link below to send your signed message to Self without scanning
-                this QR on the same device.
+                Tap the link below to send your signed message to Self if on mobile.
               </div>
               <a
                 href={universalLink}
