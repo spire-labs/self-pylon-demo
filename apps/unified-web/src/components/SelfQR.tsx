@@ -97,6 +97,11 @@ function Inner({ address, onProofVerified }: Props) {
     const endpoint = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS;
     // Get the scope seed (short string) - this is what SelfAppBuilder expects
     const scopeSeed = process.env.NEXT_PUBLIC_SELF_SCOPE;
+    // Build a return URL for deeplink callback (brings user back to this page)
+    const deeplinkCallback =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}${window.location.pathname}?selfReturn=1`
+        : undefined;
 
     console.log('[SelfQR] Building Self app with scope seed:', scopeSeed, 'endpoint:', endpoint);
     console.log('[SelfQR] Scope seed type:', typeof scopeSeed, 'Scope seed length:', scopeSeed?.length);
@@ -142,6 +147,7 @@ function Inner({ address, onProofVerified }: Props) {
       endpointType: 'celo', // Use Celo for on-chain validation
       userIdType: 'hex',
       userDefinedData: userDefinedData, // Pass the properly formatted data
+      deeplinkCallback,
       disclosures: {
         minimumAge: 18,
         ofac: true,
@@ -303,6 +309,22 @@ function Inner({ address, onProofVerified }: Props) {
     }
   };
 
+  // If arriving from Self via deeplink callback, auto-enable deeplink handling and check status
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const returned = params.get('selfReturn');
+    if (returned) {
+      setUseDeeplink(true);
+      checkVerificationStatus();
+      // Clean the param to avoid re-trigger on refresh
+      params.delete('selfReturn');
+      const newUrl =
+        window.location.pathname + (params.toString() ? `?${params.toString()}` : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []); // Only run once on mount to check for callback return
+
   // When returning from Self app (deeplink flow), re-check verification as a safety net
   useEffect(() => {
     if (!useDeeplink) return;
@@ -317,6 +339,20 @@ function Inner({ address, onProofVerified }: Props) {
     return () => {
       window.removeEventListener('visibilitychange', handler);
       window.removeEventListener('focus', handler);
+    };
+  }, [useDeeplink, effectiveSignature, selfApp]);
+
+  // Poll as a fallback while deeplink flow is active (helps if events are missed)
+  useEffect(() => {
+    if (!useDeeplink || !effectiveSignature || !selfApp) return;
+    const interval = setInterval(() => {
+      checkVerificationStatus();
+    }, 5000);
+    // Allow plenty of time for first-time users to download/setup Self and attest
+    const timeout = setTimeout(() => clearInterval(interval), 15 * 60 * 1000); // 15 minutes
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
     };
   }, [useDeeplink, effectiveSignature, selfApp]);
 
@@ -384,23 +420,6 @@ function Inner({ address, onProofVerified }: Props) {
               setStatus(`Error: ${error.message || 'Unknown error'}`);
             }}
           />
-          {useDeeplink && (
-            <div style={{ display: 'none' }}>
-              <SelfQRcodeWrapper
-                selfApp={selfApp}
-                type="deeplink"
-                onSuccess={() => {
-                  console.log('Self deeplink success event received');
-                  setStatus('Self verification completed! Checking on-chain status...');
-                  checkVerificationStatus();
-                }}
-                onError={(error: any) => {
-                  console.error('Self deeplink error:', error);
-                  setStatus(`Error: ${error.message || 'Unknown error'}`);
-                }}
-              />
-            </div>
-          )}
         </div>
       ) : (
         <div style={{ 
