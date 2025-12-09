@@ -2,10 +2,19 @@
 
 # Build script for deploying unified frontend as static site
 # This builds directly to the docs folder for GitHub Pages
+#
+# Usage:
+#   ./scripts/build-for-deployment.sh
+#   # or with custom basePath:
+#   NEXT_PUBLIC_BASE_PATH="/your-custom-path" ./scripts/build-for-deployment.sh
 
 set -e
 
+# Use NEXT_PUBLIC_BASE_PATH if set, otherwise default to /self-pylon-demo
+BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-/self-pylon-demo}"
+
 echo "🚀 Building unified-web for GitHub Pages deployment..."
+echo "📌 Using basePath: ${BASE_PATH}"
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
@@ -15,7 +24,7 @@ mkdir -p docs
 # Build unified-web directly to docs root
 echo "📦 Building unified-web to docs/..."
 cd apps/unified-web
-OUTPUT_DIR=../../docs pnpm build
+OUTPUT_DIR=../../docs NEXT_PUBLIC_BASE_PATH="${BASE_PATH}" pnpm build
 cd ../..
 
 # Add .nojekyll file to bypass Jekyll processing
@@ -32,4 +41,7 @@ echo "   - Branch: main"
 echo "   - Folder: /docs"
 echo ""
 echo "🌐 Your app will be available at:"
-echo "   - https://yourusername.github.io/self-pylon-demo/"
+echo "   - https://yourusername.github.io${BASE_PATH}/"
+echo ""
+echo "💡 To use a different basePath, set NEXT_PUBLIC_BASE_PATH:"
+echo "   NEXT_PUBLIC_BASE_PATH=\"/your-path\" ./scripts/build-for-deployment.sh"

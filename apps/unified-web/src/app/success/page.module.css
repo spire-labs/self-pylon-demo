@@ -27,15 +27,18 @@
 
 .topText {
   padding: 16px;
-  background: url("/self-pylon-demo/mint/diamond.svg") center/cover no-repeat;
-  width: 480px;
+  background: url("/mint/diamond.svg") center/cover no-repeat;
+  width: 100%;
   height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .imageBlock {
   width: 480px;
   height: 400px;
-  background: url("/self-pylon-demo/mint/diamond.svg") center/cover no-repeat;
+  background: url("/mint/diamond.svg") center/cover no-repeat;
   margin: 0 auto;
   border: 1px solid #d0d0d0;
 }
@@ -44,7 +47,7 @@
 
 .cardTop {
   padding: 32px 32px 240px;
-  background: url("/self-pylon-demo/mint/diamond.svg") bottom right/contain no-repeat;
+  background: url("/mint/diamond.svg") bottom right/contain no-repeat;
 }
 
 .textBlock {
@@ -122,13 +125,25 @@
   border: none;
   width: 100%;
   padding: 16px 18px;
-  background: #0b1b47;
+  background: linear-gradient(180deg, rgba(197, 247, 227, 0.3) -78%, rgba(11, 27, 71, 0) 100%),
+    linear-gradient(0deg, #0b1b47, #0b1b47);
   color: #ffffff;
   font-family: "Work Sans", sans-serif;
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.05em;
   cursor: pointer;
+  border-radius: 2px;
+  margin-top: 4px;
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.primaryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 
@@ -173,7 +188,7 @@
   }
 
   .topText {
-    width: 358px;
+    width: 100%;
     height: 280px;
     border: 1px solid #0b1b47;
     border-radius: 2px;

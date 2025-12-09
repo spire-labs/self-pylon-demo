@@ -15,12 +15,12 @@ export type AddressBook = {
 
 export const addresses: AddressBook = {
   celo: {
-    proofOfHuman: '0x0000000000000000000000000000000000000000'
+    proofOfHuman: '0x5E05a5CCf9fe3EC0a4b602A56381D685D0f711a8' // ProofOfHuman on Celo mainnet
   },
   pylon: {
     settlementPort: '0x0000000000000000000000000000000000000042', // Fixed address on all Pylon chains
-    proofOfHumanProxy: '0x0000000000000000000000000000000000000000',
-    humanNft: '0x0000000000000000000000000000000000000000'
+    proofOfHumanProxy: '0xa0077219389A1aE6c061CCEBDc9760C626dA90B5', // SettlementForwardingProxy on Pylon (post-genesis)
+    humanNft: '0x6DC93BEFC7311089B92A39242411ACd102A0F6f8' // HumanNFT on Pylon (post-genesis)
   }
 };
 

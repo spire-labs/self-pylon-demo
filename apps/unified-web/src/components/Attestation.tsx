@@ -208,9 +208,11 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
               />
               <div>EIP-191 Signature generated!</div>
             </div>
-            <div className={stepTwoStyles.signatureHash}>
-              Signature: {signature ? `${signature.slice(0, 20)}...${signature.slice(-10)}` : '0x7208653b7dbc280814...071d89241c'}
-            </div>
+            {signature && (
+              <div className={stepTwoStyles.signatureHash}>
+                Signature: {signature.slice(0, 20)}...{signature.slice(-10)}
+              </div>
+            )}
           </div>
         </div>
 

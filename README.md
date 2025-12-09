@@ -113,10 +113,11 @@ export PROOF_OF_HUMAN_ADDRESS=0x5E05a5CCf9fe3EC0a4b602A56381D685D0f711a8
 export PYLON_RPC_URL=https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc
 export PYLON_CHAIN_ID=2139
 export PYLON_SETTLEMENT_PORT=0x0000000000000000000000000000000000000042
-# Celo contract address
+# Celo contract address (legacy - HumanNFT was previously deployed on Celo)
 # export HUMAN_NFT_ADDRESS=0xE95515970B457130B5D891666e02ABBA49c84448
-# Pylon contract address
-export HUMAN_NFT_ADDRESS=0x0A2222269B3e6AB7426a45347D080BB68Ce22e73
+# Pylon contract addresses (post-genesis redeployment)
+export SETTLEMENT_FORWARDING_PROXY=0xa0077219389A1aE6c061CCEBDc9760C626dA90B5
+export HUMAN_NFT_ADDRESS=0x6DC93BEFC7311089B92A39242411ACd102A0F6f8
 
 # Configure attest-web (Celo mainnet)
 cat > apps/attest-web/.env.local << EOF
@@ -393,10 +394,28 @@ EOF
 
 **Default: Unified Frontend**
 
+The app should run with a basePath of `/self-pylon-demo` for production. This matches the GitHub Pages deployment structure.
+
 ```bash
 # Start unified-web (complete flow in one app)
+# Access at: http://localhost:3000/self-pylon-demo/
 pnpm --filter unified-web dev
 ```
+
+**Custom Base Path**
+
+To run with a different basePath (e.g., for testing different deployment paths or if using a subdomain):
+
+```bash
+# Set custom basePath (must start with /)
+export NEXT_PUBLIC_BASE_PATH="/mika-hello"
+
+# Start the dev server
+# Access at: http://localhost:3000/mika-hello/
+pnpm --filter unified-web dev
+```
+
+**Important**: When running locally with a basePath, you must access the app at `http://localhost:PORT/basePath/` (not at the root). All assets and routes will be prefixed with the basePath.
 
 **Legacy: Separate Frontends (Deprecated)**
 
@@ -418,10 +437,17 @@ pnpm --parallel --filter attest-web --filter claim-web dev
 
 To deploy the unified frontend to GitHub Pages:
 
-1. **Build the static site**:
+1. **Build the static site** (default basePath is `/self-pylon-demo`):
    ```bash
    ./scripts/build-for-deployment.sh
    ```
+
+   **Custom Base Path**: To deploy with a different basePath (e.g., if your repo name is different):
+   ```bash
+   NEXT_PUBLIC_BASE_PATH="/your-custom-path" ./scripts/build-for-deployment.sh
+   ```
+   
+   The `NEXT_PUBLIC_BASE_PATH` environment variable controls the basePath used in production. If not set, it defaults to `/self-pylon-demo`.
 
 2. **Commit and push**:
    ```bash
@@ -439,7 +465,10 @@ To deploy the unified frontend to GitHub Pages:
 Your unified app will be available at:
 - `https://yourusername.github.io/self-pylon-demo/` (Unified frontend - complete flow in one app)
 
-**Note**: Only the unified frontend (`unified-web`) is deployed by default. The legacy separate frontends (`attest-web` and `claim-web`) are deprecated and no longer deployed automatically.
+**Note**: 
+- The default basePath is `/self-pylon-demo` which matches the repository name for GitHub Pages
+- Only the unified frontend (`unified-web`) is deployed by default. The legacy separate frontends (`attest-web` and `claim-web`) are deprecated and no longer deployed automatically.
+- The basePath is configured in `apps/unified-web/next.config.mjs` and can be overridden with the `NEXT_PUBLIC_BASE_PATH` environment variable
 
 ## Important Notes
 

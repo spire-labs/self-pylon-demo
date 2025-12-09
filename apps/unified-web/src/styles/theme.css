@@ -2,8 +2,8 @@
 
 @font-face {
   font-family: 'Concrette S TRIAL';
-  src: url('/self-pylon-demo/fonts/ConcretteS-TRIAL-Medium.woff2') format('woff2'),
-       url('/self-pylon-demo/fonts/ConcretteS-TRIAL-Medium.woff') format('woff');
+  src: url('/fonts/ConcretteS-TRIAL-Medium.woff2') format('woff2'),
+       url('/fonts/ConcretteS-TRIAL-Medium.woff') format('woff');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
