@@ -142,6 +142,9 @@ importers:
       '@self-pylon-demo/abis':
         specifier: workspace:*
         version: link:../../packages/abis
+      '@selfxyz/common':
+        specifier: 0.0.5
+        version: 0.0.5(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@selfxyz/qrcode':
         specifier: 1.0.11
         version: 1.0.11(bufferutil@4.0.9)(jiti@2.6.1)(lottie-react@2.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(postcss@8.5.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.2)(utf-8-validate@5.0.10)
