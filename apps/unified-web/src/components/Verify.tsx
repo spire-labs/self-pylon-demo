@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { useAccount, useWriteContract, useSwitchChain, usePublicClient, useDisconnect } from 'wagmi';
+import { useAccount, useWriteContract, useSwitchChain, usePublicClient, useDisconnect, useBalance } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import stepOneStyles from './VerifyStepOneCard.module.css';
@@ -41,6 +41,15 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
   const [isWaitingForReceipt, setIsWaitingForReceipt] = useState(false);
 
   const effectiveAddress = address || connectedAddress;
+
+  // Check user's balance on Pylon to determine if they need faucet funds
+  const { data: pylonBalance } = useBalance({
+    address: effectiveAddress as `0x${string}` | undefined,
+    chainId: pylon.id,
+  });
+  
+  // Consider user as having no funds if balance is 0 or undefined
+  const hasNoFunds = !pylonBalance || pylonBalance.value === BigInt(0);
 
   // Check verification status function - called manually when user clicks button
   // Use HumanNFT contract on Pylon to check verification (via SettlementForwardingProxy)
@@ -353,24 +362,13 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
             >
               {isWritePending ? 'Minting...' : isWaitingForReceipt ? 'Waiting for confirmation...' : 'Mint Human NFT'}
             </button>
-            <div style={{ 
-              marginTop: '12px', 
-              textAlign: 'center',
-              fontFamily: '"Work Sans", sans-serif',
-              fontSize: '12px',
-              color: '#0b1b47',
-              opacity: 0.6
-            }}>
+            <div className={successStyles.faucetContainer}>
               Need test tokens for gas?{' '}
               <a 
                 href="https://celo-faucet.onrender.com/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                style={{ 
-                  color: '#0b1b47',
-                  textDecoration: 'underline',
-                  cursor: 'pointer'
-                }}
+                className={hasNoFunds ? successStyles.faucetLinkHighlight : successStyles.faucetLink}
               >
                 Get Pylon test CELO from faucet
               </a>
