@@ -4,7 +4,8 @@ const nextConfig = {
   output: 'export',
   trailingSlash: true,
   distDir: process.env.OUTPUT_DIR || 'out',
-  basePath: process.env.OUTPUT_DIR ? '' : '',
+  basePath: '/self-pylon-demo',
+  assetPrefix: '/self-pylon-demo',
   experimental: {
     typedRoutes: true
   },

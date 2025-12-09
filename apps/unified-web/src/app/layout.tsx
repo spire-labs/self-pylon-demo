@@ -13,14 +13,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link
           rel="preload"
-          href="/fonts/ConcretteS-TRIAL-Medium.woff2"
+          href="fonts/ConcretteS-TRIAL-Medium.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
         />
         <link
           rel="preload"
-          href="/fonts/ConcretteS-TRIAL-Medium.woff"
+          href="fonts/ConcretteS-TRIAL-Medium.woff"
           as="font"
           type="font/woff"
           crossOrigin="anonymous"
