@@ -1,11 +1,10 @@
 .container {
-  position: fixed;
-  bottom: 0;
+  position: static; /* keep in flow to avoid covering content */
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 15px 16px 16px 16px;
+  padding: 15px 16px 24px 16px;
   font-family: "Work Sans", sans-serif;
   font-weight: 400;
   font-style: normal;
@@ -13,7 +12,7 @@
   line-height: 125%;
   letter-spacing: -0.05em;
   color: #0b1b47;
-  opacity: 0.5;
+  opacity: 0.78;
 }
 
 .proofText {

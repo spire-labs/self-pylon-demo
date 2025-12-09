@@ -9,6 +9,16 @@ import { fromSuccessEvent } from '@self-pylon-demo/self-adapter';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { SelfQRcodeWrapper, SelfAppBuilder } from '@selfxyz/qrcode';
+import { getUniversalLink, SelfApp } from '@selfxyz/common/utils/appType';
+
+function isLikelyMobile() {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || '';
+  const coarse = window.matchMedia?.('(pointer:coarse)')?.matches;
+  const smallScreen = window.innerWidth < 900;
+  const mobileRegex = /android|iphone|ipad|ipod|iemobile|mobile/i;
+  return mobileRegex.test(ua) || coarse || smallScreen;
+}
 
 type Props = {
   address?: string;
@@ -23,6 +33,13 @@ function Inner({ address, onProofVerified }: Props) {
   const [status, setStatus] = useState<string>('Scan QR code with Self app');
   const [proofData, setProofData] = useState<any>(null);
   const [signature, setSignature] = useState<string>('');
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile early for UX hints (no SSR)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setIsMobile(isLikelyMobile());
+  }, []);
 
   // Load signature from localStorage if available - check immediately on mount
   useEffect(() => {
@@ -129,6 +146,15 @@ function Inner({ address, onProofVerified }: Props) {
       }
     }).build();
   }, [address, connectedAddress, signature]);
+
+  const universalLink = useMemo(() => {
+    try {
+      return selfApp ? getUniversalLink(selfApp as SelfApp) : '';
+    } catch (err) {
+      console.error('[SelfQR] Failed generating universal link:', err);
+      return '';
+    }
+  }, [selfApp]);
 
   // Listen for WebSocket events from Self app
   useEffect(() => {
@@ -282,6 +308,51 @@ function Inner({ address, onProofVerified }: Props) {
     <div>
       {effectiveSignature && selfApp ? (
         <div style={{ marginBottom: 16 }}>
+          {isMobile && universalLink && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '12px',
+                borderRadius: 8,
+                background:
+                  'linear-gradient(180deg, rgba(197, 247, 227, 0.35) 0%, rgba(197, 247, 227, 0.1) 100%)',
+                border: '1px solid rgba(11, 27, 71, 0.12)',
+                color: '#0b1b47',
+                fontFamily: '"Work Sans", sans-serif',
+                fontSize: 12,
+                lineHeight: '150%',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Mobile detected</div>
+              <div style={{ opacity: 0.85, marginBottom: 8 }}>
+                Tap the link below to send your signed message to Self without scanning
+                this QR on the same device.
+              </div>
+              <a
+                href={universalLink}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                  background:
+                    'linear-gradient(180deg, rgba(11, 27, 71, 0.9) 0%, rgba(11, 27, 71, 0.78) 100%)',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  letterSpacing: '-0.02em',
+                  boxShadow: '0 8px 20px rgba(11, 27, 71, 0.25)',
+                }}
+              >
+                Open in Self app
+                <span aria-hidden style={{ opacity: 0.9 }}>↗</span>
+              </a>
+            </div>
+          )}
           <SelfQRcodeWrapper
             selfApp={selfApp}
             onSuccess={() => {

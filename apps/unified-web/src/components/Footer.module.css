@@ -1,11 +1,11 @@
 .container {
-  position: fixed;
-  bottom: 0;
+  position: static; /* stay in flow so it never overlays content */
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 15px 16px 16px 16px;
+  padding: 15px 16px 24px 16px;
+  background: transparent;
 }
 
 .footerText {
@@ -17,6 +17,6 @@
   line-height: 125%;
   letter-spacing: -0.05em;
   color: #0b1b47;
-  opacity: 0.5;
+  opacity: 0.78;
 }
 

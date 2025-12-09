@@ -1,5 +1,6 @@
 "use client";
 import { useAccount, useDisconnect, useSwitchChain, useConnect } from 'wagmi';
+import { useEffect, useState } from 'react';
 import { injected } from 'wagmi/connectors';
 import { useRouter } from 'next/navigation';
 import { celo } from '../chains/celo';
@@ -34,6 +35,14 @@ export default function Header({
   const { switchChain } = useSwitchChain();
   const { connect, isPending } = useConnect();
   const router = useRouter();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const effectiveAddress = address || connectedAddress;
   const effectiveIsConnected = address ? true : isConnected;
@@ -78,7 +87,10 @@ export default function Header({
 
   if (variant === 'main') {
     return (
-      <div className={mainStyles.container} style={{ cursor: 'pointer' }}>
+      <div
+        className={`${mainStyles.container} ${scrolled ? mainStyles.scrolled : ''}`}
+        style={{ cursor: 'pointer' }}
+      >
         <div className={mainStyles.logoContainer} onClick={() => router.push('/')}>
           <Logo />
         </div>
@@ -112,7 +124,7 @@ export default function Header({
 
   // Change variant (with network toggle)
   return (
-    <div className={changeStyles.container}>
+    <div className={`${changeStyles.container} ${scrolled ? changeStyles.scrolled : ''}`}>
       <div className={changeStyles.headerGrid}>
         <div className={changeStyles.logoContainer} onClick={() => router.push('/')}>
           <Logo />
