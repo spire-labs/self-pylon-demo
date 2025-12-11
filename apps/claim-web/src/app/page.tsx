@@ -1,7 +1,8 @@
 "use client";
 import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain, usePublicClient } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { createPublicClient, custom, type PublicClient, decodeErrorResult } from 'viem';
 import { HumanNFTABI } from '@self-pylon-demo/abis';
 import { pylon } from '../chains/pylon';
 import Status from '../components/Status';
@@ -16,7 +17,22 @@ export default function Page() {
   const { switchChain } = useSwitchChain();
   const [mintStatus, setMintStatus] = useState('');
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
-  const publicClient = usePublicClient();
+  const defaultPublicClient = usePublicClient();
+  
+  // Create a publicClient using the injected provider's transport when available
+  const publicClient = useMemo<PublicClient | undefined>(() => {
+    if (typeof window !== 'undefined' && window.ethereum && isConnected) {
+      // Use the injected provider (window.ethereum) for the publicClient
+      console.log('Using injected provider transport for publicClient');
+      return createPublicClient({
+        chain: pylon,
+        transport: custom(window.ethereum)
+      });
+    }
+    // Fall back to default publicClient
+    console.log('Using default RPC transport for publicClient');
+    return defaultPublicClient;
+  }, [isConnected, defaultPublicClient]);
   
   // Hydration safety - prevent server/client mismatch
   const [isHydrated, setIsHydrated] = useState(false);
@@ -55,27 +71,73 @@ export default function Page() {
           });
           // Should not reach here if transaction reverted
         } catch (callError: any) {
-          // Extract revert reason from the call error - this is the actual revert message
-          if (callError?.shortMessage) {
-            revertReason = callError.shortMessage;
-            // Clean up common prefixes
-            if (revertReason.includes('execution reverted: ')) {
-              revertReason = revertReason.replace('execution reverted: ', '');
-            } else if (revertReason.includes('execution reverted')) {
-              revertReason = revertReason.replace('execution reverted', '').trim();
+          // Log full error for debugging
+          console.error('Full call error:', callError);
+          
+          // Extract error data for decoding
+          const errorData = callError?.data || callError?.cause?.data;
+          
+          // Try to decode custom error if we have error data
+          if (errorData && typeof errorData === 'string' && errorData.startsWith('0x')) {
+            try {
+              const decoded = decodeErrorResult({
+                abi: HumanNFTABI,
+                data: errorData as `0x${string}`
+              });
+              revertReason = `Custom Error: ${decoded.errorName}${decoded.args && decoded.args.length > 0 ? `(${decoded.args.join(', ')})` : ''}`;
+            } catch (decodeErr) {
+              // If decoding fails, it might be a string revert or unknown error format
+              console.log('Could not decode as custom error, trying string revert:', decodeErr);
             }
-          } else if (callError?.message) {
-            revertReason = callError.message;
-            if (revertReason.includes('execution reverted: ')) {
-              revertReason = revertReason.replace('execution reverted: ', '');
-            } else if (revertReason.includes('execution reverted')) {
-              revertReason = revertReason.replace('execution reverted', '').trim();
+          }
+          
+          // If we haven't decoded a custom error, extract revert reason from message
+          if (revertReason === 'Transaction reverted') {
+            if (callError?.shortMessage) {
+              revertReason = callError.shortMessage;
+              // Clean up common prefixes
+              if (revertReason.includes('execution reverted: ')) {
+                revertReason = revertReason.replace('execution reverted: ', '');
+              } else if (revertReason.includes('execution reverted')) {
+                revertReason = revertReason.replace('execution reverted', '').trim();
+              }
+            } else if (callError?.message) {
+              revertReason = callError.message;
+              if (revertReason.includes('execution reverted: ')) {
+                revertReason = revertReason.replace('execution reverted: ', '');
+              } else if (revertReason.includes('execution reverted')) {
+                revertReason = revertReason.replace('execution reverted', '').trim();
+              }
+            } else if (callError?.cause?.reason) {
+              revertReason = callError.cause.reason;
+            } else if (errorData) {
+              revertReason = `Revert data: ${errorData}`;
             }
-          } else if (callError?.cause?.reason) {
-            revertReason = callError.cause.reason;
-          } else if (callError?.cause?.data) {
-            // Try to decode if it's ABI-encoded revert data
-            revertReason = `Revert data: ${callError.cause.data}`;
+          }
+          
+          // Extract additional error information (codes, data, etc.)
+          // Note: JSON-RPC error codes like -32000 (execution reverted) are standard
+          // Custom errors typically still use -32000, but the data field contains the error selector
+          const errorDetails: string[] = [];
+          if (callError?.code !== undefined && callError?.code !== null) {
+            // Only show error code if it's not the standard -32000 (execution reverted)
+            // or if it's a different code that might be meaningful
+            if (callError.code !== -32000) {
+              errorDetails.push(`Error Code: ${callError.code}`);
+            }
+          }
+          if (callError?.cause?.code !== undefined && callError?.cause?.code !== null) {
+            if (callError.cause.code !== -32000) {
+              errorDetails.push(`Cause Code: ${callError.cause.code}`);
+            }
+          }
+          if (callError?.details) {
+            errorDetails.push(`Details: ${callError.details}`);
+          }
+          
+          // Append error details if available
+          if (errorDetails.length > 0) {
+            revertReason += `\n${errorDetails.join('\n')}`;
           }
         }
         setMintStatus(`Submitted: ${txHash}\n❌ ${revertReason}`);
@@ -97,6 +159,25 @@ export default function Page() {
         errorMessage = e.cause.reason;
       }
       
+      // Extract additional error information
+      const errorDetails: string[] = [];
+      if (e?.code) {
+        errorDetails.push(`Error Code: ${e.code}`);
+      }
+      if (e?.data) {
+        errorDetails.push(`Error Data: ${e.data}`);
+      }
+      if (e?.cause?.code) {
+        errorDetails.push(`Cause Code: ${e.cause.code}`);
+      }
+      if (e?.cause?.data) {
+        errorDetails.push(`Cause Data: ${e.cause.data}`);
+      }
+      
+      if (errorDetails.length > 0) {
+        errorMessage += `\n${errorDetails.join('\n')}`;
+      }
+      
       setMintStatus(`Submitted: ${txHash}\n❌ ${errorMessage}`);
     }
   };
@@ -116,12 +197,24 @@ export default function Page() {
         return;
       }
       
+      setMintStatus('Estimating gas...');
+      // Estimate gas and multiply by 2 for safety margin
+      const estimatedGas = await publicClient.estimateContractGas({
+        address: nftAddr,
+        abi: HumanNFTABI,
+        functionName: 'mint',
+        args: [],
+        account: address as `0x${string}`
+      });
+      const gasWithMargin = estimatedGas * BigInt(2); // Multiply by 2
+
       setMintStatus('Minting...');
       const txHash = await writeContractAsync({
         address: nftAddr,
         abi: HumanNFTABI,
         functionName: 'mint',
-        args: []
+        args: [],
+        gas: gasWithMargin
       });
       
       // Show transaction hash immediately with loading indicator
@@ -149,6 +242,28 @@ export default function Page() {
         errorMessage = `Transaction failed: ${error.cause.reason}`;
       } else if (error?.data?.message) {
         errorMessage = error.data.message;
+      }
+      
+      // Extract additional error information (codes, data, etc.)
+      const errorDetails: string[] = [];
+      if (error?.code) {
+        errorDetails.push(`Error Code: ${error.code}`);
+      }
+      if (error?.data) {
+        errorDetails.push(`Error Data: ${error.data}`);
+      }
+      if (error?.cause?.code) {
+        errorDetails.push(`Cause Code: ${error.cause.code}`);
+      }
+      if (error?.cause?.data && !errorMessage.includes(error.cause.data)) {
+        errorDetails.push(`Cause Data: ${error.cause.data}`);
+      }
+      if (error?.details) {
+        errorDetails.push(`Details: ${error.details}`);
+      }
+      
+      if (errorDetails.length > 0) {
+        errorMessage += `\n${errorDetails.join('\n')}`;
       }
       
       setMintStatus(`❌ ${errorMessage}`);
@@ -268,6 +383,7 @@ export default function Page() {
                     <Status label="HumanNFT Contract" value={process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS || 'Not set'} />
                     <Status label="Pylon RPC" value={process.env.NEXT_PUBLIC_PYLON_RPC_URL || 'Not set'} />
                     <Status label="Pylon Chain ID" value={process.env.NEXT_PUBLIC_PYLON_CHAIN_ID || 'Not set'} />
+                    <Status label="PublicClient Transport" value={typeof window !== 'undefined' && window.ethereum && isConnected ? 'Injected Provider' : 'Default RPC'} />
                   </div>
                   
                   <div className="pt-4">

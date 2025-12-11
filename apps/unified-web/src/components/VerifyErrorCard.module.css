@@ -46,9 +46,55 @@
   letter-spacing: -0.05em;
   color: #aa002f;
   opacity: 50%;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.alertTextCollapsed {
+  font-family: Work Sans;
+  font-weight: 400;
+  font-style: Regular;
+  font-size: 14px;
+  leading-trim: NONE;
+  line-height: 125%;
+  letter-spacing: -0.05em;
+  color: #aa002f;
+  opacity: 50%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-height: 100px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  position: relative;
+}
+
+.alertTextCollapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to bottom, transparent, #ffeaf0);
+}
+
+.expandButton {
+  font-family: Work Sans;
+  font-weight: 500;
+  font-size: 12px;
+  color: #aa002f;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 8px;
+  text-decoration: underline;
+  opacity: 0.7;
+}
+
+.expandButton:hover {
+  opacity: 1;
 }
 
 .primaryButton {

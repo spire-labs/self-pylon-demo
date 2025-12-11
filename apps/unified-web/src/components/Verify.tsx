@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAccount, useWriteContract, useSwitchChain, usePublicClient, useDisconnect, useBalance } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -16,7 +16,8 @@ import {
   isUserRejection,
   extractRevertReason,
   isNullifierUsedError,
-  simulateMint
+  simulateMint,
+  getRevertReasonFromSimulate
 } from '../lib/contractUtils';
 
 type VerifyState = 'step1' | 'success' | 'error';
@@ -39,6 +40,7 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
   const [isVerified, setIsVerified] = useState(false);
   const [isCheckingVerification, setIsCheckingVerification] = useState(false);
   const [isWaitingForReceipt, setIsWaitingForReceipt] = useState(false);
+  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
 
   const effectiveAddress = address || connectedAddress;
 
@@ -144,13 +146,21 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
       if (receipt.status === 'reverted') {
         let revertReason = 'Transaction reverted';
         try {
-          // Try to simulate the mint call to get revert reason
-          const simulatedRevert = await simulateMintCall();
+          const simulatedRevert = await getRevertReasonFromSimulate(
+            publicClient,
+            effectiveAddress as `0x${string}`,
+            nftAddr,
+            receipt.blockNumber
+          );
           if (simulatedRevert) {
             revertReason = simulatedRevert;
           }
         } catch (callError: any) {
-          revertReason = extractRevertReason(callError) ?? revertReason;
+          // If both methods fail, try to extract from the error
+          const extractedReason = extractRevertReason(callError);
+          if (extractedReason) {
+            revertReason = extractedReason;
+          }
         }
         
         if (isNullifierUsedError(revertReason)) {
@@ -213,12 +223,24 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
         return;
       }
 
+      setMintStatus('Estimating gas...');
+      // Estimate gas and multiply by 2 for safety margin
+      const estimatedGas = await publicClient.estimateContractGas({
+        address: nftAddr,
+        abi: HumanNFTABI,
+        functionName: 'mint',
+        args: [],
+        account: effectiveAddress as `0x${string}`
+      });
+      const gasWithMargin = estimatedGas * BigInt(2); // Multiply by 2
+
       setMintStatus('Minting...');
       const txHash = await writeContractAsync({
         address: nftAddr,
         abi: HumanNFTABI,
         functionName: 'mint',
-        args: []
+        args: [],
+        gas: gasWithMargin
       });
       
       setMintStatus(`Submitted: ${txHash}\n⏳ Waiting for confirmation...`);
@@ -229,15 +251,50 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
       const userRejected = isUserRejection(e);
       let errorMessage = cleanRevertMessage(extractErrorMessage(e));
       
-      // Try eth_call to check if transaction would revert (even for "user rejections")
-      const hasRevertInfo = errorMessage.includes('execution reverted') || errorMessage.includes('revert');
-      if (!hasRevertInfo) {
+      // Check if error contains a transaction hash (transaction was submitted but error occurred)
+      // This can happen when Pylon allows transactions to be submitted even if they revert
+      // Check both error message and error object properties
+      let txHashFromError: `0x${string}` | null = null;
+      
+      // Check error object properties first (more reliable)
+      if (e?.hash && typeof e.hash === 'string' && e.hash.startsWith('0x')) {
+        txHashFromError = e.hash as `0x${string}`;
+      } else if (e?.transactionHash && typeof e.transactionHash === 'string' && e.transactionHash.startsWith('0x')) {
+        txHashFromError = e.transactionHash as `0x${string}`;
+      } else {
+        // Fallback: try to extract from error message
+        const txHashMatch = errorMessage.match(/0x[a-fA-F0-9]{64}/);
+        txHashFromError = txHashMatch ? (txHashMatch[0] as `0x${string}`) : null;
+      }
+      
+      // If we have a transaction hash in the error, wait for receipt to get actual revert reason
+      if (txHashFromError && !userRejected) {
+        setMintStatus(`Submitted: ${txHashFromError}\n⏳ Waiting for confirmation...`);
+        waitForReceipt(txHashFromError);
+        return;
+      }
+      
+      // Check if error message is generic (like "An internal error was received")
+      const isGenericError = 
+        errorMessage.includes('An internal error was received') ||
+        errorMessage.includes('internal error') ||
+        (errorMessage.includes('reverted') && !errorMessage.includes('execution reverted:'));
+      
+      // Try to get actual revert reason if error is generic or doesn't have revert info
+      const hasRevertInfo = errorMessage.includes('execution reverted:') || 
+                           (errorMessage.includes('revert') && !isGenericError);
+      
+      if (!hasRevertInfo && !userRejected) {
+        // Try simulation first
         const revertReason = await simulateMintCall();
         if (revertReason) {
           errorMessage = revertReason;
-        } else if (userRejected) {
-          errorMessage = 'Transaction was rejected by user';
+        } else if (isGenericError) {
+          // For generic errors, try to get more info
+          errorMessage = 'Transaction failed. Please check the transaction using cast cli or similar for details.';
         }
+      } else if (userRejected) {
+        errorMessage = 'Transaction was rejected by user';
       }
       
       // Check for nullifier already used errors
@@ -425,9 +482,19 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
               Error checking verification status
             </span>
           </div>
-          <p className={errorStyles.alertText}>
-            {mintStatus || 'Error checking verification status. Please verify your identity first with Self.'}
-          </p>
+          <div>
+            <p className={isErrorExpanded ? errorStyles.alertText : errorStyles.alertTextCollapsed}>
+              {mintStatus || 'Error checking verification status. Please verify your identity first with Self.'}
+            </p>
+            {mintStatus && (
+              <button
+                onClick={() => setIsErrorExpanded(!isErrorExpanded)}
+                className={errorStyles.expandButton}
+              >
+                {isErrorExpanded ? 'Show less' : 'Show more'}
+              </button>
+            )}
+          </div>
         </div>
  
         <button

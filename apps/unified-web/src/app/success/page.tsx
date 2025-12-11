@@ -11,7 +11,8 @@ import {
   cleanRevertMessage,
   extractErrorMessage,
   isNullifierUsedError,
-  simulateMint
+  simulateMint,
+  getRevertReasonFromSimulate
 } from '../../lib/contractUtils';
 
 export default function SuccessPage() {
@@ -47,12 +48,24 @@ export default function SuccessPage() {
     }
     
     try {
+      setMintStatus('Estimating gas...');
+      // Estimate gas and multiply by 2 for safety margin
+      const estimatedGas = await publicClient.estimateContractGas({
+        address: nftAddr,
+        abi: HumanNFTABI,
+        functionName: 'mint',
+        args: [],
+        account: address as `0x${string}`
+      });
+      const gasWithMargin = estimatedGas * BigInt(2); // Multiply by 2
+
       setMintStatus('Minting...');
       const txHash = await writeContractAsync({
         address: nftAddr,
         abi: HumanNFTABI,
         functionName: 'mint',
-        args: []
+        args: [],
+        gas: gasWithMargin
       });
       
       setMintStatus(`Submitted: ${txHash}\n⏳ Waiting for confirmation...`);
@@ -63,7 +76,10 @@ export default function SuccessPage() {
         setIsWaitingForReceipt(false);
         
         if (receipt.status === 'reverted') {
-          const revertReason = await simulateMintCall() ?? 'Transaction reverted';
+          const revertReason =
+            (await getRevertReasonFromSimulate(publicClient, address as `0x${string}`, nftAddr, receipt.blockNumber)) ??
+            (await simulateMintCall()) ??
+            'Transaction reverted';
           
           if (isNullifierUsedError(revertReason)) {
             router.push('/fail');
@@ -76,7 +92,27 @@ export default function SuccessPage() {
         }
       } catch (e: any) {
         setIsWaitingForReceipt(false);
-        const errorMessage = cleanRevertMessage(extractErrorMessage(e));
+        let errorMessage = cleanRevertMessage(extractErrorMessage(e));
+        
+        // Try to get revert reason from transaction if error is generic
+        if (errorMessage.includes('internal error') || errorMessage.includes('reverted')) {
+          try {
+            const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+            if (receipt.status === 'reverted') {
+              const revertReason = await getRevertReasonFromSimulate(
+                publicClient,
+                address as `0x${string}`,
+                nftAddr,
+                receipt.blockNumber
+              );
+              if (revertReason) {
+                errorMessage = revertReason;
+              }
+            }
+          } catch (receiptError) {
+            // Ignore receipt errors, use original error message
+          }
+        }
         
         if (isNullifierUsedError(errorMessage)) {
           router.push('/fail');
@@ -106,7 +142,7 @@ export default function SuccessPage() {
 
   return (
     <>
-      <Header currentNetwork={currentNetwork} onNetworkChange={setCurrentNetwork} />
+      <Header variant="change" currentNetwork={currentNetwork} onNetworkChange={setCurrentNetwork} />
       <main className={styles.page}>
         <div className={styles.content}>
           <section className={styles.card}>
