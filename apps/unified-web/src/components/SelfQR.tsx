@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useAccount, useSignMessage, usePublicClient, useSwitchChain } from 'wagmi';
 import { celo } from '../chains/celo';
 import { fromSuccessEvent } from '@self-pylon-demo/self-adapter';
+import { detectWalletBrowser, buildWalletCallbackUrl } from '../lib/walletDetection';
 
 // Import Self QR components (package must be installed in the app workspace)
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -99,12 +100,12 @@ function Inner({ address, onProofVerified }: Props) {
     const scopeSeed = process.env.NEXT_PUBLIC_SELF_SCOPE;
     console.log('[SelfQR] Building Self app with scope seed:', scopeSeed, 'endpoint:', endpoint);
     console.log('[SelfQR] Scope seed type:', typeof scopeSeed, 'Scope seed length:', scopeSeed?.length);
-    
+
     if (!scopeSeed) {
       console.error('[SelfQR] No scope seed provided! Set NEXT_PUBLIC_SELF_SCOPE in .env.local');
       return null;
     }
-    
+
     if (!endpoint) {
       console.error('[SelfQR] No endpoint provided! Set NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS in .env.local');
       return null;
@@ -112,7 +113,7 @@ function Inner({ address, onProofVerified }: Props) {
 
     // Use generated signature or placeholder if none available
     const signatureToUse = signature || '0x' + '0'.repeat(130);
-    
+
     // The contract expects 129 bytes: 64 bytes prefix + 65 bytes signature
     // Create the userData array that matches what the contract expects
     // let userDefinedData = signature
@@ -123,7 +124,7 @@ function Inner({ address, onProofVerified }: Props) {
       const signatureHex = signature.slice(2); // Remove '0x' prefix
       const signatureBytes = new Uint8Array(signatureHex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []);
       userDefinedData = '0x' + Array.from(signatureBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-      
+
       console.log('[SelfQR] userDefinedData length (hex chars):', userDefinedData.length - 2); // -2 for '0x'
       console.log('[SelfQR] userDefinedData first 100 chars:', userDefinedData.substring(0, 100));
       console.log('[SelfQR] userDefinedData last 100 chars:', userDefinedData.substring(userDefinedData.length - 100));
@@ -131,8 +132,9 @@ function Inner({ address, onProofVerified }: Props) {
       // Placeholder data
       userDefinedData = '0x' + '0'.repeat(258); // 129 bytes = 258 hex chars
     }
-    
-    return new SelfAppBuilder({
+
+    // Build the SelfApp configuration
+    const appConfig: any = {
       version: 2,
       appName: 'Self ↔ Pylon Demo',
       scope: scopeSeed,
@@ -145,7 +147,28 @@ function Inner({ address, onProofVerified }: Props) {
         minimumAge: 18,
         ofac: true,
       }
-    }).build();
+    };
+
+    // Only set deeplinkCallback if we're in a recognized mobile wallet browser
+    const walletInfo = detectWalletBrowser();
+    if (walletInfo.shouldSetCallback && typeof window !== 'undefined') {
+      const currentUrl = window.location.origin + window.location.pathname;
+      const appCallbackUrl = currentUrl + '?selfReturn=1';
+
+      // Use wallet-specific deeplink scheme to ensure we return to the correct wallet browser
+      const walletCallbackUrl = buildWalletCallbackUrl(appCallbackUrl);
+      if (walletCallbackUrl) {
+        appConfig.deeplinkCallback = walletCallbackUrl;
+        console.log('[SelfQR] Setting wallet-specific deeplinkCallback for', walletInfo.walletType, 'wallet:', appConfig.deeplinkCallback);
+      } else {
+        appConfig.deeplinkCallback = appCallbackUrl;
+        console.log('[SelfQR] Setting fallback deeplinkCallback for', walletInfo.walletType, 'wallet:', appConfig.deeplinkCallback);
+      }
+    } else {
+      console.log('[SelfQR] Not setting deeplinkCallback - not in recognized mobile wallet browser');
+    }
+
+    return new SelfAppBuilder(appConfig).build();
   }, [address, connectedAddress, signature]);
 
   const universalLink = useMemo(() => {
@@ -301,6 +324,24 @@ function Inner({ address, onProofVerified }: Props) {
       setStatus(`❌ Error checking verification status: ${errorMessage}. Check the console for details.`);
     }
   };
+
+  // If arriving from Self via deeplink callback, auto-enable deeplink handling and check status
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const returned = params.get('selfReturn');
+    if (returned) {
+      const walletInfo = detectWalletBrowser();
+      console.log('[SelfQR] Returning from Self deeplink in', walletInfo.walletType, 'wallet');
+      setUseDeeplink(true);
+      checkVerificationStatus();
+      // Clean the param to avoid re-trigger on refresh
+      params.delete('selfReturn');
+      const newUrl =
+        window.location.pathname + (params.toString() ? `?${params.toString()}` : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []); // Only run once on mount to check for callback return
 
   // When returning from Self app (deeplink flow), re-check verification as a safety net
   useEffect(() => {
