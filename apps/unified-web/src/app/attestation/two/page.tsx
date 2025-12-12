@@ -13,14 +13,13 @@ export default function AttestationTwoPage() {
   const [currentNetwork, setCurrentNetwork] = useState<'celo' | 'pylon'>('celo');
 
   useEffect(() => {
-    const hasSignature = typeof window !== 'undefined' && localStorage.getItem('attestation_signature');
-    if (!address && !hasSignature) {
+    // Redirect if wallet is disconnected
+    if (!address) {
       router.push('/');
     }
   }, [address, router]);
 
-  const hasSignature = typeof window !== 'undefined' && localStorage.getItem('attestation_signature');
-  if (!address && !hasSignature) return null;
+  if (!address) return null;
 
   return (
     <>

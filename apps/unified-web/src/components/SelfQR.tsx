@@ -1,6 +1,6 @@
 "use client";
 import dynamic from 'next/dynamic';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAccount, useSignMessage, usePublicClient, useSwitchChain } from 'wagmi';
 import { celo } from '../chains/celo';
 import { fromSuccessEvent } from '@self-pylon-demo/self-adapter';
@@ -23,20 +23,24 @@ function isLikelyMobile() {
 
 type Props = {
   address?: string;
+  signature?: string;
   onProofVerified?: () => void;
 };
 
-function Inner({ address, onProofVerified }: Props) {
+function Inner({ address, signature: signatureProp, onProofVerified }: Props) {
   const { address: connectedAddress, chainId } = useAccount();
   const { signMessageAsync, isPending: isSigning } = useSignMessage();
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const [status, setStatus] = useState<string>('Scan QR code with Self app');
   const [proofData, setProofData] = useState<any>(null);
-  const [signature, setSignature] = useState<string>('');
+  const [internalSignature, setInternalSignature] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
   const [useDeeplink, setUseDeeplink] = useState(false);
+  // Use prop signature if provided, otherwise use internal state
+  const signature = signatureProp || internalSignature;
   const effectiveSignature = signature;
+  const previousAddressRef = useRef<string | undefined>(undefined);
 
   // Detect mobile early for UX hints (no SSR)
   useEffect(() => {
@@ -44,51 +48,51 @@ function Inner({ address, onProofVerified }: Props) {
     setIsMobile(isLikelyMobile());
   }, []);
 
-  // Load signature from localStorage if available - check immediately on mount
+  // Clear signature when wallet disconnects or address changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedSig = localStorage.getItem('attestation_signature');
-      if (storedSig) {
-        console.log('[SelfQR] Loaded signature from localStorage:', storedSig.substring(0, 20) + '...');
-        setSignature(storedSig);
-        setStatus('✅ Signature loaded. QR code ready to scan.');
-      } else {
-        console.log('[SelfQR] No signature found in localStorage');
-        setStatus('⚠️ No signature found. Please generate a signature first.');
+    const currentAddress = address || connectedAddress;
+    const prevAddress = previousAddressRef.current;
+    previousAddressRef.current = currentAddress;
+    
+    // Clear signature if address changed or disconnected (only clear internal signature, not prop)
+    if (prevAddress !== undefined && prevAddress !== currentAddress) {
+      setInternalSignature('');
+      if (!signatureProp) {
+        setStatus('⚠️ Wallet address changed. Please generate a new signature.');
+      }
+    } else if (!currentAddress) {
+      // No address connected, clear internal signature
+      setInternalSignature('');
+      if (!signatureProp) {
+        setStatus('⚠️ No wallet connected. Please connect a wallet first.');
       }
     }
-  }, []); // Run once on mount
-
-  // Also reload if address changes (user reconnects)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && address && !signature) {
-      const storedSig = localStorage.getItem('attestation_signature');
-      if (storedSig) {
-        console.log('[SelfQR] Reloaded signature after address change:', storedSig.substring(0, 20) + '...');
-        setSignature(storedSig);
-      }
-    }
-  }, [address, signature]);
+  }, [address, connectedAddress, signatureProp]);
 
   // Function to generate signature proving address ownership
   const generateSignature = async (userAddress: string): Promise<string> => {
     if (!userAddress) return '';
     
     try {
+      // Clear any existing signature before generating a new one
+      setInternalSignature('');
+      
       // Create message to sign
       const message = `I confirm that both this passport and public address ${userAddress.toLowerCase()} are owned by me`;
       console.log('[SelfQR] Message to sign:', message);
       
       // Use personal_sign to generate EIP-191 signature
-      const signature = await signMessageAsync({ message });
+      const sig = await signMessageAsync({ message });
       
-      console.log('[SelfQR] EIP-191 signature generated:', signature);
-      setSignature(signature);
+      console.log('[SelfQR] EIP-191 signature generated:', sig);
+      setInternalSignature(sig);
       setStatus('✅ EIP-191 signature generated! You can now scan the QR code.');
-      return signature;
+      return sig;
     } catch (error) {
       console.error('[SelfQR] Error generating EIP-191 signature:', error);
       setStatus('❌ Failed to generate EIP-191 signature. Please try again.');
+      // Clear signature on error
+      setInternalSignature('');
       return '';
     }
   };

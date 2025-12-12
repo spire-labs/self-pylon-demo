@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useSignMessage, usePublicClient, useSwitchChain } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import { celo } from '../chains/celo';
@@ -29,29 +29,33 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
   const [signature, setSignature] = useState<string>('');
   const [shouldPoll, setShouldPoll] = useState(false);
   const [lockSuccess, setLockSuccess] = useState(false);
+  const previousAddressRef = useRef<string | undefined>(undefined);
 
   const effectiveAddress = address || connectedAddress;
 
-  // Load signature from localStorage on mount
+  // Clear signature when wallet disconnects or address changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedSig = localStorage.getItem('attestation_signature');
-      if (storedSig) {
-        setSignature(storedSig);
-        // If signature exists, we're on step 2
-        if (state === 'step1') {
-          setState('step2');
-        }
+    const prevAddress = previousAddressRef.current;
+    previousAddressRef.current = effectiveAddress;
+    
+    // Clear signature if address changed or disconnected
+    if (prevAddress !== undefined && prevAddress !== effectiveAddress) {
+      setSignature('');
+      if (state !== 'step1') {
+        setState('step1');
+      }
+    } else if (!effectiveAddress) {
+      // No address connected, clear signature
+      setSignature('');
+      if (state !== 'step1') {
+        setState('step1');
       }
     }
-  }, [state]);
+  }, [effectiveAddress, state]);
 
   // Handle proof verified signal from Self QR code
   const handleProofVerified = () => {
     console.log('[Attestation] Proof verified signal received, showing success and starting polling...');
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('attestation_signature');
-    }
     setLockSuccess(true);
     setShouldPoll(true);
     setState('success');
@@ -96,9 +100,6 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
             
             if (verified) {
               // Success! Verification confirmed on-chain
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem('attestation_signature');
-              }
               setShouldPoll(false);
               setState('success');
               if (onSuccess) {
@@ -138,15 +139,17 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
     try {
       setLockSuccess(false);
       setShouldPoll(false);
+      // Clear any existing signature before generating a new one
+      setSignature('');
+      
       const message = `I confirm that both this passport and public address ${effectiveAddress.toLowerCase()} are owned by me`;
       const sig = await signMessageAsync({ message });
       setSignature(sig);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('attestation_signature', sig);
-      }
       setState('step2');
     } catch (error) {
       console.error('Error generating signature:', error);
+      // Clear signature on error
+      setSignature('');
     }
   };
 

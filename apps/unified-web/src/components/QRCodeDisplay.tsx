@@ -42,7 +42,7 @@ function QRCodeDisplayInner({ address, signature, onProofVerified }: QRCodeDispl
 
   return (
     <div className={styles.qrWrapper}>
-      <SelfQR address={address} onProofVerified={onProofVerified} />
+      <SelfQR address={address} signature={signature} onProofVerified={onProofVerified} />
       <div className={styles.qrText}>Use only Self app to scan</div>
       <a
         href={getAppStoreLink()}
