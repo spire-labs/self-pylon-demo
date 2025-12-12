@@ -28,6 +28,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
   const [state, setState] = useState<AttestationState>(initialState || 'step1');
   const [signature, setSignature] = useState<string>('');
   const [shouldPoll, setShouldPoll] = useState(false);
+  const [lockSuccess, setLockSuccess] = useState(false);
 
   const effectiveAddress = address || connectedAddress;
 
@@ -47,13 +48,18 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
 
   // Handle proof verified signal from Self QR code
   const handleProofVerified = () => {
-    console.log('[Attestation] Proof verified signal received, starting polling...');
+    console.log('[Attestation] Proof verified signal received, showing success and starting polling...');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('attestation_signature');
+    }
+    setLockSuccess(true);
     setShouldPoll(true);
+    setState('success');
   };
 
   // Poll verification status only after receiving proof_verified signal from Self
   useEffect(() => {
-    if (shouldPoll && state === 'step2' && effectiveAddress) {
+    if (shouldPoll && (state === 'step2' || state === 'success') && effectiveAddress) {
       let pollCount = 0;
       const maxPolls = 20; // Poll for up to 60 seconds (20 * 3s)
       
@@ -102,18 +108,20 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
               // Not verified yet, continue polling
               pollCount++;
               if (pollCount >= maxPolls) {
-                // Max polls reached, show error
                 console.error('[Attestation] Max polling attempts reached, verification not found on-chain');
                 setShouldPoll(false);
-                setState('error');
+                if (!lockSuccess) {
+                  setState('error');
+                }
               }
             }
           }
         } catch (error) {
           console.error('Error checking verification:', error);
-          // On error, stop polling and show error state
           setShouldPoll(false);
-          setState('error');
+          if (!lockSuccess) {
+            setState('error');
+          }
         }
       };
 
@@ -122,12 +130,14 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
       const interval = setInterval(checkVerification, 3000);
       return () => clearInterval(interval);
     }
-  }, [shouldPoll, state, effectiveAddress, onSuccess, publicClient, chainId, switchChain]);
+  }, [shouldPoll, state, effectiveAddress, onSuccess, publicClient, chainId, switchChain, lockSuccess]);
 
   const generateSignature = async () => {
     if (!effectiveAddress) return;
     
     try {
+      setLockSuccess(false);
+      setShouldPoll(false);
       const message = `I confirm that both this passport and public address ${effectiveAddress.toLowerCase()} are owned by me`;
       const sig = await signMessageAsync({ message });
       setSignature(sig);
@@ -145,6 +155,8 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
   };
 
   const handleRetry = () => {
+    setLockSuccess(false);
+    setShouldPoll(false);
     setState('step2');
   };
 
