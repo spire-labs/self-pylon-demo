@@ -11,7 +11,7 @@ build/
 # Foundry
 cache/
 out/
-lib/
+contracts/lib/
 broadcast/
 
 # Logs
