@@ -7,12 +7,16 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import styles from './page.module.css';
 import buttonStyles from '../components/ui/Button.module.css';
+import { useFaucetAutoRequest } from '../lib/useFaucetAutoRequest';
 
 export default function LandingPage() {
   const { isConnected, address } = useAccount();
   const { connect, isPending, error: connectError } = useConnect();
   const router = useRouter();
   const [errorMessage, setErrorMessage] = useState<string>('');
+  
+  // Automatically request faucet funds when wallet is connected and has zero balance
+  const { isRequestingFaucet } = useFaucetAutoRequest();
 
   // Navigate when connected
   useEffect(() => {

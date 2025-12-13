@@ -19,3 +19,4 @@ export const getBasePath = (): string => {
 
 // Export the basePath as a constant for use in config files
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH?.trim() || '/self-pylon-demo';
+

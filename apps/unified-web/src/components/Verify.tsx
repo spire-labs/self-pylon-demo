@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { useAccount, useWriteContract, useSwitchChain, usePublicClient, useDisconnect, useBalance } from 'wagmi';
+import { useAccount, useWriteContract, useSwitchChain, usePublicClient, useDisconnect } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import stepOneStyles from './VerifyStepOneCard.module.css';
@@ -19,6 +19,7 @@ import {
   simulateMint,
   getRevertReasonFromSimulate
 } from '../lib/contractUtils';
+import { useFaucetAutoRequest } from '../lib/useFaucetAutoRequest';
 
 type VerifyState = 'step1' | 'success' | 'error';
 
@@ -44,14 +45,9 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
 
   const effectiveAddress = address || connectedAddress;
 
-  // Check user's balance on Pylon to determine if they need faucet funds
-  const { data: pylonBalance } = useBalance({
-    address: effectiveAddress as `0x${string}` | undefined,
-    chainId: pylon.id,
-  });
-  
-  // Consider user as having no funds if balance is 0 or undefined
-  const hasNoFunds = !pylonBalance || pylonBalance.value === BigInt(0);
+  // Automatically request faucet funds when user has zero balance on Pylon
+  // This hook handles balance checking and faucet requests automatically
+  const { isRequestingFaucet, hasNoFunds } = useFaucetAutoRequest();
 
   // Check verification status function - called manually when user clicks button
   // Use HumanNFT contract on Pylon to check verification (via SettlementForwardingProxy)
@@ -369,6 +365,21 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
           </div>
         )}
 
+        {isRequestingFaucet && state === 'step1' && (
+          <div style={{ 
+            padding: '12px 16px', 
+            backgroundColor: '#fef3c7', 
+            borderRadius: '4px',
+            fontFamily: '"Work Sans", sans-serif',
+            fontSize: '14px',
+            color: '#92400e',
+            textAlign: 'center',
+            marginTop: mintStatus ? '8px' : '0'
+          }}>
+            ⏳ Requesting test tokens from faucet...
+          </div>
+        )}
+
         <div className={stepOneStyles.walletCard}>
           <div className={stepOneStyles.walletRow}>
             <span className={stepOneStyles.walletLabel}>Connected Wallet</span>
@@ -420,15 +431,23 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
               {isWritePending ? 'Minting...' : isWaitingForReceipt ? 'Waiting for confirmation...' : 'Mint Human NFT'}
             </button>
             <div className={successStyles.faucetContainer}>
-              Need test tokens for gas?{' '}
-              <a 
-                href="https://celo-faucet.onrender.com/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={hasNoFunds ? successStyles.faucetLinkHighlight : successStyles.faucetLink}
-              >
-                Get Pylon test CELO from faucet
-              </a>
+              {isRequestingFaucet ? (
+                <span>⏳ Requesting test tokens from faucet...</span>
+              ) : hasNoFunds ? (
+                <>
+                  Need test tokens for gas?{' '}
+                  <a 
+                    href="https://faucet.celo-mainnet.spire.dev/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className={successStyles.faucetLinkHighlight}
+                  >
+                    Get Pylon test CELO from faucet
+                  </a>
+                </>
+              ) : (
+                <span style={{ opacity: 0.7 }}>✅ You have test tokens</span>
+              )}
             </div>
           </div>
         </section>

@@ -42,3 +42,4 @@ echo ""
 echo "🌐 Your apps will be available at:"
 echo "   - https://yourusername.github.io/self-pylon-demo/attest/"
 echo "   - https://yourusername.github.io/self-pylon-demo/claim/"
+

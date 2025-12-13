@@ -15,3 +15,4 @@ declare module '@selfxyz/common/utils/appType' {
 
   export function getUniversalLink(selfApp: SelfApp): string;
 }
+
