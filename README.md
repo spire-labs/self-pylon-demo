@@ -394,28 +394,28 @@ EOF
 
 **Default: Unified Frontend**
 
-The app should run with a basePath of `/self-pylon-demo` for production. This matches the GitHub Pages deployment structure.
+By default, the app runs with an empty basePath (for custom domain deployment). To run locally:
 
 ```bash
 # Start unified-web (complete flow in one app)
-# Access at: http://localhost:3000/self-pylon-demo/
+# Access at: http://localhost:3000/
 pnpm --filter unified-web dev
 ```
 
 **Custom Base Path**
 
-To run with a different basePath (e.g., for testing different deployment paths or if using a subdomain):
+To run with a basePath (e.g., for testing repository path deployment):
 
 ```bash
 # Set custom basePath (must start with /)
-export NEXT_PUBLIC_BASE_PATH="/mika-hello"
+export NEXT_PUBLIC_BASE_PATH="/self-pylon-demo"
 
 # Start the dev server
-# Access at: http://localhost:3000/mika-hello/
+# Access at: http://localhost:3000/self-pylon-demo/
 pnpm --filter unified-web dev
 ```
 
-**Important**: When running locally with a basePath, you must access the app at `http://localhost:PORT/basePath/` (not at the root). All assets and routes will be prefixed with the basePath.
+**Important**: When running locally with a basePath, you must access the app at `http://localhost:PORT/basePath/` (not at the root). All assets and routes will be prefixed with the basePath. If basePath is empty, access the app at the root URL.
 
 **Legacy: Separate Frontends (Deprecated)**
 
@@ -437,17 +437,27 @@ pnpm --parallel --filter attest-web --filter claim-web dev
 
 To deploy the unified frontend to GitHub Pages:
 
-1. **Build the static site** (default basePath is `/self-pylon-demo`):
+1. **Build the static site** (default basePath is empty for custom domain deployment):
    ```bash
-   ./scripts/build-for-deployment.sh
+   ./scripts/build-for-deployment-unified.sh
    ```
 
-   **Custom Base Path**: To deploy with a different basePath (e.g., if your repo name is different):
+   **For Custom Domain** (e.g., `human.spire.dev`):
    ```bash
-   NEXT_PUBLIC_BASE_PATH="/your-custom-path" ./scripts/build-for-deployment.sh
+   GITHUB_PAGES_CUSTOM_DOMAIN="human.spire.dev" ./scripts/build-for-deployment-unified.sh
+   ```
+   - The build script will automatically create a `CNAME` file in the `docs/` folder with your custom domain
+   - The default build uses an empty basePath, which is correct for custom domains
+   - After building, configure your custom domain in GitHub Pages settings
+   - Set up DNS CNAME record pointing your subdomain to your GitHub Pages domain
+   - Your site will be available at `https://human.spire.dev/`
+
+   **For Repository Path Deployment** (e.g., `username.github.io/self-pylon-demo/`):
+   ```bash
+   NEXT_PUBLIC_BASE_PATH="/self-pylon-demo" ./scripts/build-for-deployment-unified.sh
    ```
    
-   The `NEXT_PUBLIC_BASE_PATH` environment variable controls the basePath used in production. If not set, it defaults to `/self-pylon-demo`.
+   The `NEXT_PUBLIC_BASE_PATH` environment variable controls the basePath used in production. If not set, it defaults to empty (for custom domain deployment).
 
 2. **Commit and push**:
    ```bash
@@ -461,12 +471,15 @@ To deploy the unified frontend to GitHub Pages:
    - Source: "Deploy from a branch"
    - Branch: `main`
    - Folder: `/docs`
+   - **For custom domain**: Enter your custom domain (e.g., `human.spire.dev`) in the "Custom domain" field
 
 Your unified app will be available at:
-- `https://yourusername.github.io/self-pylon-demo/` (Unified frontend - complete flow in one app)
+- `https://your-custom-domain.com/` (if using custom domain with empty basePath)
+- `https://yourusername.github.io/self-pylon-demo/` (if using repository path with basePath set)
 
 **Note**: 
-- The default basePath is `/self-pylon-demo` which matches the repository name for GitHub Pages
+- The default basePath is empty, which is suitable for custom domain deployment (e.g., `human.spire.dev`)
+- To use a repository path, set `NEXT_PUBLIC_BASE_PATH` to match your repository name
 - Only the unified frontend (`unified-web`) is deployed by default. The legacy separate frontends (`attest-web` and `claim-web`) are deprecated and no longer deployed automatically.
 - The basePath is configured in `apps/unified-web/next.config.mjs` and can be overridden with the `NEXT_PUBLIC_BASE_PATH` environment variable
 
