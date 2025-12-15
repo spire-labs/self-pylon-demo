@@ -17,7 +17,8 @@ import {
   extractRevertReason,
   isNullifierUsedError,
   simulateMint,
-  getRevertReasonFromSimulate
+  getRevertReasonFromSimulate,
+  checkNFTBalance
 } from '../lib/contractUtils';
 import { useFaucetAutoRequest } from '../lib/useFaucetAutoRequest';
 
@@ -49,6 +50,47 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
   // This hook handles balance checking and faucet requests automatically
   const { isRequestingFaucet, hasNoFunds } = useFaucetAutoRequest();
 
+  // Check if user already owns an NFT when component mounts or chain changes
+  // If they do, redirect to success page
+  useEffect(() => {
+    const checkIfAlreadyHasNFT = async () => {
+      if (!effectiveAddress || !publicClient || initialState !== 'step1') return;
+      
+      const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
+      if (!nftAddr || nftAddr === '0x0000000000000000000000000000000000000000') return;
+
+      // We need to be on Pylon to check NFT balance
+      // Switch to Pylon if needed, then check
+      let clientToUse = publicClient;
+      if (chainId !== pylon.id) {
+        try {
+          await switchChain({ chainId: pylon.id });
+          // Wait a moment for chain switch
+          await new Promise(resolve => setTimeout(resolve, 500));
+          // After switch, we need to wait for publicClient to update
+          // The component will re-render with new chainId, so we'll check again
+          return;
+        } catch (error) {
+          // Chain switch failed or was rejected - skip check
+          console.error('Failed to switch to Pylon for NFT check:', error);
+          return;
+        }
+      }
+
+      try {
+        const hasNFT = await checkNFTBalance(publicClient, effectiveAddress as `0x${string}`, nftAddr);
+        if (hasNFT) {
+          router.push('/success');
+        }
+      } catch (error) {
+        // Silently fail - user will be able to verify normally
+        console.error('Error checking NFT balance on mount:', error);
+      }
+    };
+
+    checkIfAlreadyHasNFT();
+  }, [effectiveAddress, publicClient, chainId, initialState, router, switchChain]);
+
   // Check verification status function - called manually when user clicks button
   // Use HumanNFT contract on Pylon to check verification (via SettlementForwardingProxy)
   // This uses the same mechanism as mint() and reads from Celo synchronously through Pylon
@@ -67,6 +109,14 @@ export default function Verify({ address, onMintSuccess, initialState }: VerifyP
       
       const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
       if (nftAddr && nftAddr !== '0x0000000000000000000000000000000000000000') {
+        // First check if user already owns an NFT - if so, redirect to success page
+        const hasNFT = await checkNFTBalance(publicClient, effectiveAddress as `0x${string}`, nftAddr);
+        if (hasNFT) {
+          // User already has an NFT, redirect to success page
+          router.push('/success');
+          return;
+        }
+        
         // Use wagmi's publicClient (configured to use wallet provider, avoiding CORS)
         const nullifier = await publicClient.readContract({
           address: nftAddr,

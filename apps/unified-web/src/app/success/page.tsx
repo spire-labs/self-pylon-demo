@@ -14,15 +14,19 @@ import {
   simulateMint,
   getRevertReasonFromSimulate
 } from '../../lib/contractUtils';
+import { useSwitchChain } from 'wagmi';
+import { pylon } from '../../chains/pylon';
 
 export default function SuccessPage() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
   const router = useRouter();
   const [currentNetwork, setCurrentNetwork] = useState<'celo' | 'pylon'>('pylon');
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient();
   const [mintStatus, setMintStatus] = useState('');
   const [isWaitingForReceipt, setIsWaitingForReceipt] = useState(false);
+  const [showErrorState, setShowErrorState] = useState(false);
 
   const nftAddr = process.env.NEXT_PUBLIC_HUMAN_NFT_ADDRESS as `0x${string}`;
   const simulateMintCall = () => simulateMint(publicClient, address as `0x${string}`, nftAddr);
@@ -45,6 +49,17 @@ export default function SuccessPage() {
     if (!publicClient) {
       setMintStatus('Error: Public client not available');
       return;
+    }
+
+    // Ensure we're on Pylon
+    if (chainId && chainId !== pylon.id) {
+      try {
+        await switchChain({ chainId: pylon.id });
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        setMintStatus('Please switch to Human Appchain to mint');
+        return;
+      }
     }
     
     try {
@@ -81,14 +96,13 @@ export default function SuccessPage() {
             (await simulateMintCall()) ??
             'Transaction reverted';
           
-          if (isNullifierUsedError(revertReason)) {
-            router.push('/fail');
-          } else {
-            setMintStatus(`Submitted: ${txHash}\n❌ ${revertReason}`);
-          }
+          // Show error state with button to go back
+          setMintStatus(`Submitted: ${txHash}\n❌ ${revertReason}`);
+          setShowErrorState(true);
         } else {
           // Mint succeeded - show success message (we're already on /success page)
           setMintStatus(`✅ NFT minted successfully!\nTransaction: ${txHash}`);
+          setShowErrorState(false);
         }
       } catch (e: any) {
         setIsWaitingForReceipt(false);
@@ -114,11 +128,9 @@ export default function SuccessPage() {
           }
         }
         
-        if (isNullifierUsedError(errorMessage)) {
-          router.push('/fail');
-        } else {
-          setMintStatus(`Submitted: ${txHash}\n❌ ${errorMessage}`);
-        }
+        // Show error state with button to go back
+        setMintStatus(`Submitted: ${txHash}\n❌ ${errorMessage}`);
+        setShowErrorState(true);
       }
     } catch (e: any) {
       console.error('Mint error:', e);
@@ -128,11 +140,9 @@ export default function SuccessPage() {
       const revertReason = await simulateMintCall();
       const errorMessage = revertReason ?? cleanRevertMessage(extractErrorMessage(e));
       
-      if (isNullifierUsedError(errorMessage)) {
-        router.push('/fail');
-      } else {
-        setMintStatus(`❌ ${errorMessage}`);
-      }
+      // Show error state with button to go back
+      setMintStatus(`❌ ${errorMessage}`);
+      setShowErrorState(true);
     }
   };
 
@@ -175,27 +185,55 @@ export default function SuccessPage() {
                 />
               </div>
 
-              <button
-                className={styles.primaryButton}
-                onClick={handleMintAnother}
-                disabled={isWritePending || isWaitingForReceipt}
-              >
-                {isWritePending ? 'Minting...' : isWaitingForReceipt ? 'Waiting for confirmation...' : 'Try to mint another to see Human NFT\'s Sybil resistance in action'}
-              </button>
-              
-              {mintStatus && (
-                <div style={{ 
-                  marginTop: '4px',
-                  padding: '12px', 
-                  backgroundColor: '#f3f4f6', 
-                  borderRadius: '4px',
-                  fontFamily: '"Work Sans", sans-serif',
-                  fontSize: '14px',
-                  color: '#374151',
-                  whiteSpace: 'pre-line'
-                }}>
-                  {mintStatus}
-                </div>
+              {!showErrorState ? (
+                <>
+                  <button
+                    className={styles.primaryButton}
+                    onClick={handleMintAnother}
+                    disabled={isWritePending || isWaitingForReceipt}
+                  >
+                    {isWritePending ? 'Minting...' : isWaitingForReceipt ? 'Waiting for confirmation...' : 'Try to mint another to see Human NFT\'s Sybil resistance in action'}
+                  </button>
+                  
+                  {mintStatus && !mintStatus.includes('❌') && (
+                    <div style={{ 
+                      marginTop: '4px',
+                      padding: '12px', 
+                      backgroundColor: '#f3f4f6', 
+                      borderRadius: '4px',
+                      fontFamily: '"Work Sans", sans-serif',
+                      fontSize: '14px',
+                      color: '#374151',
+                      whiteSpace: 'pre-line'
+                    }}>
+                      {mintStatus}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {mintStatus && (
+                    <div style={{ 
+                      marginBottom: '16px',
+                      padding: '12px', 
+                      backgroundColor: '#fee2e2', 
+                      borderRadius: '4px',
+                      fontFamily: '"Work Sans", sans-serif',
+                      fontSize: '14px',
+                      color: '#991b1b',
+                      whiteSpace: 'pre-line'
+                    }}>
+                      {mintStatus}
+                    </div>
+                  )}
+                  <button
+                    className={styles.primaryButton}
+                    onClick={() => router.push('/verify/one')}
+                    style={{ marginTop: '8px' }}
+                  >
+                    Go back to verify
+                  </button>
+                </>
               )}
             </div>
           </section>

@@ -130,3 +130,30 @@ export const getRevertReasonFromSimulate = async (
     return extractRevertReason(err);
   }
 };
+
+/**
+ * Check if an address already owns an NFT.
+ * Returns true if balance > 0, false if balance is 0 or check fails.
+ */
+export const checkNFTBalance = async (
+  publicClient: PublicClient | undefined,
+  address: `0x${string}` | undefined,
+  nftAddress: `0x${string}` | undefined
+): Promise<boolean> => {
+  if (!publicClient || !address || !nftAddress || nftAddress === '0x0000000000000000000000000000000000000000') {
+    return false;
+  }
+  
+  try {
+    const balance = await publicClient.readContract({
+      address: nftAddress,
+      abi: HumanNFTABI,
+      functionName: 'balanceOf',
+      args: [address]
+    });
+    return balance > BigInt(0);
+  } catch (error) {
+    console.error('Error checking NFT balance:', error);
+    return false;
+  }
+};

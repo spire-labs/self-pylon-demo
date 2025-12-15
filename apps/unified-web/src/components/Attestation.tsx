@@ -29,6 +29,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
   const [signature, setSignature] = useState<string>('');
   const [shouldPoll, setShouldPoll] = useState(false);
   const [lockSuccess, setLockSuccess] = useState(false);
+  const [isAlreadyVerified, setIsAlreadyVerified] = useState<boolean | null>(null); // null = checking, true/false = result
   const previousAddressRef = useRef<string | undefined>(undefined);
 
   const effectiveAddress = address || connectedAddress;
@@ -52,6 +53,59 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
       }
     }
   }, [effectiveAddress, state]);
+
+  // Check if user is already verified on Celo when component mounts or address/chain changes
+  useEffect(() => {
+    const checkExistingVerification = async () => {
+      if (!effectiveAddress || !publicClient || initialState !== 'step1' || state !== 'step1') return;
+      
+      const proofOfHumanAddr = process.env.NEXT_PUBLIC_PROOF_OF_HUMAN_ADDRESS as `0x${string}`;
+      if (!proofOfHumanAddr || proofOfHumanAddr === '0x0000000000000000000000000000000000000000') {
+        setIsAlreadyVerified(false);
+        return;
+      }
+
+      // We need to be on Celo to check verification status
+      let clientToUse = publicClient;
+      if (chainId !== celo.id) {
+        try {
+          await switchChain({ chainId: celo.id });
+          // Wait a moment for chain switch
+          await new Promise(resolve => setTimeout(resolve, 500));
+          // After switch, component will re-render with new chainId, so we'll check again
+          return;
+        } catch (error) {
+          // Chain switch failed or was rejected - skip check
+          console.error('Failed to switch to Celo for verification check:', error);
+          setIsAlreadyVerified(false);
+          return;
+        }
+      }
+
+      try {
+        const verified = await publicClient.readContract({
+          address: proofOfHumanAddr,
+          abi: [{ 
+            name: 'isVerified', 
+            type: 'function', 
+            inputs: [{ name: 'user', type: 'address' }], 
+            outputs: [{ name: '', type: 'bool' }], 
+            stateMutability: 'view' 
+          }],
+          functionName: 'isVerified',
+          args: [effectiveAddress as `0x${string}`]
+        });
+        
+        setIsAlreadyVerified(verified);
+      } catch (error) {
+        // Silently fail - user will be able to proceed normally
+        console.error('Error checking existing verification:', error);
+        setIsAlreadyVerified(false);
+      }
+    };
+
+    checkExistingVerification();
+  }, [effectiveAddress, publicClient, chainId, initialState, state, switchChain]);
 
   // Handle proof verified signal from Self QR code
   const handleProofVerified = () => {
@@ -168,6 +222,21 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
     return (
       <div className={stepOneStyles.card}>
         <h2 className={stepOneStyles.title}>Generate Address Proof</h2>
+
+        {isAlreadyVerified && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            backgroundColor: '#fef3c7',
+            borderRadius: '4px',
+            fontFamily: '"Work Sans", sans-serif',
+            fontSize: '14px',
+            color: '#92400e',
+            textAlign: 'center'
+          }}>
+            ⚠️ This address has already been verified. You can attempt the process again, but it will fail because each address can only be associated with one passport.
+          </div>
+        )}
 
         <div className={stepOneStyles.step}>
           <div className={stepOneStyles.stepContainer}>
