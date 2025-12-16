@@ -4,7 +4,7 @@
   "packageManager": "pnpm@9.1.0",
   "version": "0.1.0",
   "workspaces": [
-    "apps/*",
+    "frontend",
     "contracts",
     "packages/*"
   ],
@@ -16,8 +16,8 @@
     "@selfxyz/contracts": "^1.2.0"
   },
   "scripts": {
-    "build": "pnpm -r --filter ./apps/** run build",
-    "dev": "pnpm -r --filter ./apps/** run dev",
-    "lint": "pnpm -r --filter ./apps/** run lint"
+    "build": "pnpm -r --filter frontend run build",
+    "dev": "pnpm -r --filter frontend run dev",
+    "lint": "pnpm -r --filter frontend run lint"
   }
 }
