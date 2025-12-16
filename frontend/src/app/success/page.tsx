@@ -238,9 +238,10 @@ export default function SuccessPage() {
             </div>
           </section>
         </div>
+        <div className={styles.footer}>
+          <Footer />
+        </div>
       </main>
-      <Footer />
     </>
   );
 }
-

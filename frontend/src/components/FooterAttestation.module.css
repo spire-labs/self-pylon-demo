@@ -1,5 +1,5 @@
 .container {
-  position: static; /* keep in flow to avoid covering content */
+  position: relative; /* stay in flow so it never overlays content */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -80,4 +80,3 @@
     width: 100%;
   }
 }
-

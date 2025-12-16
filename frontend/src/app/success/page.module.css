@@ -1,8 +1,9 @@
 .page {
   min-height: 100vh;
   display: flex;
-  justify-content: center;
-  padding: 120px 16px 16px;
+  flex-direction: column;
+  align-items: center;
+  padding: 120px 16px 0;
   background:
     linear-gradient(180deg, rgba(196, 220, 246, 0.8) 0%, rgba(255, 255, 255, 0.6) 70%),
     linear-gradient(180deg, rgba(255, 255, 255, 0) 25.69%, rgba(255, 248, 193, 0.4) 62.35%, rgba(255, 213, 224, 0.6) 84.19%, rgba(255, 203, 255, 0.7) 100%);
@@ -14,6 +15,12 @@
   margin: 0 auto;
   display: flex;
   justify-content: center;
+  flex: 1;
+}
+
+.footer {
+  width: 100%;
+  margin-top: auto;
 }
 
 .card {
@@ -161,7 +168,7 @@
 
 @media (max-width: 767px) {
   .page {
-    padding: 144px 16px 40px;
+    padding: 144px 16px 0;
   }
   
   .content {
@@ -207,6 +214,3 @@
     display: block;
   }
 }
-
-
-

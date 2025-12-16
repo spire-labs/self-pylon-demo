@@ -14,11 +14,8 @@
   background: #444;
 }
 .container {
-  /* position: fixed; */
-  top: 0;
-  left: 0;
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -47,12 +44,18 @@
   align-items: center;
   justify-content: center;
   gap: 32px;
+  flex: 1;
 }
 
 .titleBlock {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.footer {
+  width: 100%;
+  margin-top: auto;
 }
 
 @media (max-width: 767px) {
@@ -138,11 +141,4 @@
     text-align: center;
     max-width: 358px;
   }
-
-  .footer {
-    display: none;
-  }
 }
-
-
-

@@ -42,9 +42,10 @@ export default function AttestationTwoPage() {
 
           <Attestation address={address} initialState="step2" />
         </div>
+        <div className={styles.footer}>
+          <FooterAttestation />
+        </div>
       </main>
-      <FooterAttestation />
     </>
   );
 }
-

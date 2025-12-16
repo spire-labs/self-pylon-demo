@@ -43,9 +43,10 @@ export default function AttestationSuccessPage() {
 
           <Attestation address={address} initialState="success" />
         </div>
+        <div className={styles.footer}>
+          <FooterAttestation />
+        </div>
       </main>
-      <FooterAttestation />
     </>
   );
 }
-

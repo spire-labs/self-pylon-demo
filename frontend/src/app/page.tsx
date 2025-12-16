@@ -109,11 +109,10 @@ export default function LandingPage() {
             </>
           )}
         </div>
-      </div>
-      <div className={styles.footer}>
-        <Footer />
+        <div className={styles.footer}>
+          <Footer />
+        </div>
       </div>
     </>
   );
 }
-

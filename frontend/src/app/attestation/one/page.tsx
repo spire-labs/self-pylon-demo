@@ -43,9 +43,10 @@ export default function AttestationOnePage() {
 
           <Attestation address={address} initialState="step1" />
         </div>
+        <div className={styles.footer}>
+          <FooterAttestation />
+        </div>
       </main>
-      <FooterAttestation />
     </>
   );
 }
-

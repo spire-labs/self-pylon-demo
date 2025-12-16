@@ -43,9 +43,10 @@ export default function AttestationFailPage() {
 
           <Attestation address={address} initialState="error" />
         </div>
+        <div className={styles.footer}>
+          <FooterAttestation />
+        </div>
       </main>
-      <FooterAttestation />
     </>
   );
 }
-
