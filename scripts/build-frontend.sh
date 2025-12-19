@@ -12,6 +12,23 @@
 
 set -e
 
+# Check for .env.local file
+ENV_LOCAL_FILE="frontend/.env.local"
+if [ ! -f "$ENV_LOCAL_FILE" ]; then
+  echo "Warning: $ENV_LOCAL_FILE not found."
+  echo ""
+  echo "The frontend requires a .env.local file with all environment variables to build correctly."
+  echo "Copy frontend/.env.local.example to frontend/.env.local and fill in the required values."
+  echo ""
+  read -p "Continue anyway? (y/N) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Build cancelled. Please create frontend/.env.local first."
+    exit 1
+  fi
+  echo ""
+fi
+
 # Use NEXT_PUBLIC_BASE_PATH if set, otherwise default to empty (for custom domains)
 BASE_PATH="${NEXT_PUBLIC_BASE_PATH:-}"
 

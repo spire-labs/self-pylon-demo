@@ -108,6 +108,9 @@ NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
+# Replace 'your_walletconnect_project_id' with your actual WalletConnect project ID
+# Get your project ID from https://cloud.walletconnect.com/
+
 # Start frontend
 pnpm --filter frontend dev
 ```
@@ -301,6 +304,8 @@ echo "   - Settlement proxy on Human appchain: $PROOF_OF_HUMAN_PROXY"
 
 ## 4. Configure Frontend
 
+The frontend requires a `frontend/.env.local` file with all environment variables before building or running. This file is created below:
+
 ```bash
 # Configure frontend (complete flow in one app)
 cat > frontend/.env.local << EOF
@@ -314,6 +319,9 @@ NEXT_PUBLIC_HUMAN_NFT_ADDRESS=$HUMAN_NFT_ADDRESS
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
+# Replace 'your_walletconnect_project_id' with your actual WalletConnect project ID
+# Get your project ID from https://cloud.walletconnect.com/
+
 echo "✅ Frontend configured"'!'
 echo "   - frontend supports both Celo (chain $CELO_CHAIN_ID) and Human appchain (chain $PYLON_CHAIN_ID)"
 echo "   - Complete flow: attestation → NFT minting"
@@ -325,7 +333,7 @@ pnpm --filter frontend build
 
 ## 5. Run the Project
 
-By default, the app runs with an empty basePath (for custom domain deployment). To run locally:
+Ensure `frontend/.env.local` is configured (see section 4) before running. By default, the app runs with an empty basePath (for custom domain deployment). To run locally:
 
 ```bash
 # Start frontend (complete flow in one app)
@@ -352,10 +360,11 @@ pnpm --filter frontend dev
 
 ### GitHub Pages Deployment (Recommended)
 
-To deploy the frontend to GitHub Pages:
+Before building, ensure `frontend/.env.local` is configured with all required environment variables. You can copy `frontend/.env.local.example` as a template. The app will not function correctly without these values.
 
 1. **Build the static site** (default basePath is empty for custom domain deployment):
    ```bash
+   cd ..
    ./scripts/build-frontend.sh
    ```
 

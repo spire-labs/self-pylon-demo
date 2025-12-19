@@ -21,6 +21,7 @@ pnpm-debug.log*
 
 # Environment
 .env*
+!.env*.example
 .secrets/
 
 # OS
