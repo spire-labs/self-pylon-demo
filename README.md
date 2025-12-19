@@ -1,12 +1,12 @@
 # Self ↔ Pylon Demo
 
-A fully on-chain, privacy-preserving identity attestation system using the Self protocol and Pylon appchain with **true cross-chain architecture**.
+A fully on-chain, privacy-preserving identity attestation system using the Self protocol and Human appchain with **true cross-chain architecture**.
 
 ## Frontend
 
 This project includes a unified frontend application:
 
-**`frontend`**: A unified frontend that combines the complete flow from attestation to NFT minting in a single, well-designed application. This frontend matches the Spire design mockup and provides a seamless user experience with automatic network switching and a single flow from wallet connection → attestation → NFT minting.
+**`frontend`**: A unified frontend that combines the complete flow from attestation to NFT minting with automatic network switching and a single flow from wallet connection → attestation → NFT minting.
 
 ### Test the Complete Flow
 
@@ -15,17 +15,17 @@ This project includes a unified frontend application:
 3. **Scan QR Code**: Use Self app to scan passport and generate proof
 4. **Automatic Submission**: Self automatically submits proof to ProofOfHuman contract **on Celo mainnet**
 5. **ProofOfHuman**: Binds your wallet address to your passport without revealing passport details
-6. **Switch to Pylon**: The app automatically switches to Pylon appchain
-7. **Claim NFT**: Mint the "I am human" NFT on Pylon
-8. **Cross-Chain Verification**: The HumanNFT contract on Pylon reads your attestation from Celo via Pylon's settlement mechanism
+6. **Switch to Human appchain**: The app automatically switches to Human appchain
+7. **Claim NFT**: Mint the "I am human" NFT on Human appchain
+8. **Cross-Chain Verification**: The HumanNFT contract on Human appchain reads your attestation from Celo via a cross-chain synchronous read call
 
 ## Architecture
 
 This system enables:
 1. **Users to Maintain privacy** - only cryptographic commitments and ZK proofs are stored on-chain
 2. **App devs to defend against sybil attacks** - NFTs can only be claimed once per passport
-3. **Celo to act as a user identity hub** - Celo's network effects expand their reach making it a more attractive deployment target
-4. **True cross-chain composability** - Pylon appchain reads Celo state synchronously via settlement
+3. **Celo to act as a user identity hub** - Celo's network effects expand reach for identity-based applications
+4. **True cross-chain composability** - Human appchain reads Celo state synchronously via Pylon
 
 ```mermaid
 graph TD
@@ -38,7 +38,7 @@ graph TD
         PH[ProofOfHuman Contract]:::contractLayer
     end
     
-    subgraph Pylon["Pylon Appchain"]
+    subgraph Pylon["Human Appchain"]
         SP[Settlement Port]:::pylonLayer
         PROXY[SettlementForwardingProxy]:::pylonLayer
         HN[HumanNFT Contract]:::contractLayer
@@ -86,13 +86,13 @@ export CELO_RPC_URL=https://forno.celo.org
 export CELO_CHAIN_ID=42220
 export PROOF_OF_HUMAN_ADDRESS=0x5E05a5CCf9fe3EC0a4b602A56381D685D0f711a8
 
-# Pylon appchain configuration
+# Human appchain configuration
 export PYLON_RPC_URL=https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc
 export PYLON_CHAIN_ID=2139
 export PYLON_SETTLEMENT_PORT=0x0000000000000000000000000000000000000042
-# Celo contract address (legacy - HumanNFT was previously deployed on Celo)
+# Celo contract address
 # export HUMAN_NFT_ADDRESS=0xE95515970B457130B5D891666e02ABBA49c84448
-# Pylon contract addresses (post-genesis redeployment)
+# Human appchain contract addresses
 export SETTLEMENT_FORWARDING_PROXY=0xa0077219389A1aE6c061CCEBDc9760C626dA90B5
 export HUMAN_NFT_ADDRESS=0x6DC93BEFC7311089B92A39242411ACd102A0F6f8
 
@@ -112,7 +112,7 @@ EOF
 pnpm --filter frontend dev
 ```
 
-**Note**: The existing deployment uses the cross-chain architecture where attestations are on Celo and claims happen on Pylon via settlement.
+**Note**: The existing deployment uses the cross-chain architecture where attestations are on Celo and claims happen on Human appchain via Pylon.
 
 
 ## 1. Deploying the Project
@@ -142,12 +142,11 @@ echo "Address: $SIGNER_ADDRESS"
 export CELO_RPC_URL="https://forno.celo.org"
 export CELO_CHAIN_ID=42220
 
-# Pylon appchain - where claims happen
+# Human appchain - where claims happen
 export PYLON_RPC_URL="https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc"
 export PYLON_CHAIN_ID=2139
 
 # Pylon settlement port - enables cross-chain reads from Celo
-# This is a fixed address on all Pylon chains
 export PYLON_SETTLEMENT_PORT="0x0000000000000000000000000000000000000042"
 
 # Self Hub contract (official Self contract on Celo)
@@ -159,7 +158,7 @@ export SELF_HUB_ADDRESS=0xe57F4773bd9c9d8b6Cd70431117d353298B9f5BF
 # Check Celo connectivity
 cast block-number --rpc-url $CELO_RPC_URL
 
-# Check Pylon connectivity and verify chain ID
+# Check Human appchain connectivity and verify chain ID
 cast block-number --rpc-url $PYLON_RPC_URL
 cast chain-id --rpc-url $PYLON_RPC_URL  # Should return: 2139
 
@@ -180,7 +179,7 @@ Skip to section 3 if using our existing ProofOfHuman contract.
 
 #### Generate Self Configuration
 
-1. Visit [Self's configuration interface](https://app.self.xyz/configure)
+1. Visit [Self's configuration interface](https://tools.self.xyz/)
 2. Set verification requirements:
    - Minimum age: 18
    - Enable OFAC 1 and OFAC 2 sanctions checks
@@ -260,7 +259,7 @@ cast send $PROOF_OF_HUMAN_ADDRESS \
 --private-key $SIGNER_PRIVATE_KEY
 ```
 
-## 3. HumanNFT Setup on Pylon
+## 3. HumanNFT Setup on Human Appchain
 
 ### 3a. Using Existing Deployment
 
@@ -268,13 +267,12 @@ Skip to section 4 if using our existing HumanNFT contract.
 
 ### 3b. Deploying HumanNFT for First Time
 
-**Important**: This deployment creates both the SettlementForwardingProxy and HumanNFT on Pylon. The proxy enables cross-chain reads from Celo as if the app were deployed directly on the settlement chain.
+**Important**: This deployment creates both the SettlementForwardingProxy and HumanNFT on Human appchain. The proxy enables cross-chain reads from Celo via Pylon.
 
 ```bash
-# Set the settlement port address (fixed address on all Pylon chains)
 export PYLON_SETTLEMENT_PORT="0x0000000000000000000000000000000000000042"
 
-# Deploy on Pylon appchain (deploys both SettlementForwardingProxy and HumanNFT)
+# Deploy on Human appchain (deploys both SettlementForwardingProxy and HumanNFT)
 pushd contracts
 forge script script/DeployPylon.s.sol:DeployPylon \
   --rpc-url $PYLON_RPC_URL \
@@ -288,17 +286,17 @@ latest=$(find contracts/broadcast/DeployPylon.s.sol/$PYLON_CHAIN_ID -name "run-l
 # Get SettlementForwardingProxy address
 lowercase_proxy=$(jq -r '.transactions[] | select(.contractName=="SettlementForwardingProxy") | .contractAddress' "$latest")
 export PROOF_OF_HUMAN_PROXY=$(cast to-check-sum-address $lowercase_proxy)
-echo "SettlementForwardingProxy deployed on Pylon at: $PROOF_OF_HUMAN_PROXY"
+echo "SettlementForwardingProxy deployed on Human appchain at: $PROOF_OF_HUMAN_PROXY"
 
 # Get HumanNFT address
 lowercase_nft=$(jq -r '.transactions[] | select(.contractName=="HumanNFT") | .contractAddress' "$latest")
 export HUMAN_NFT_ADDRESS=$(cast to-check-sum-address $lowercase_nft)
-echo "HumanNFT deployed on Pylon at: $HUMAN_NFT_ADDRESS"
+echo "HumanNFT deployed on Human appchain at: $HUMAN_NFT_ADDRESS"
 echo ""
 echo "✅ Cross-chain setup complete"'!'
 echo "   - Attestations are stored on Celo: ${PROOF_OF_HUMAN_ADDRESS}"
-echo "   - Claims happen on Pylon: $HUMAN_NFT_ADDRESS"
-echo "   - Settlement proxy on Pylon: $PROOF_OF_HUMAN_PROXY"
+echo "   - Claims happen on Human appchain: $HUMAN_NFT_ADDRESS"
+echo "   - Settlement proxy on Human appchain: $PROOF_OF_HUMAN_PROXY"
 ```
 
 ## 4. Configure Frontend
@@ -317,8 +315,8 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
 echo "✅ Frontend configured"'!'
-echo "   - frontend supports both Celo (chain $CELO_CHAIN_ID) and Pylon (chain $PYLON_CHAIN_ID)"
-echo "   - Complete flow: attestation → NFT minting in one seamless experience"
+echo "   - frontend supports both Celo (chain $CELO_CHAIN_ID) and Human appchain (chain $PYLON_CHAIN_ID)"
+echo "   - Complete flow: attestation → NFT minting"
 
 # Build the frontend
 pnpm --filter frontend build
@@ -404,16 +402,16 @@ Your unified app will be available at:
 
 ### Cross-Chain Architecture
 
-This demo uses **Pylon's settlement mechanism** for synchronous cross-chain reads:
+This demo uses **Pylon** for synchronous cross-chain reads:
 
 1. **ProofOfHuman on Celo**: Stores attestations on Celo mainnet
-2. **SettlementForwardingProxy on Pylon**: Deployed on Pylon, forwards calls to Settlement Port
-3. **Settlement Port on Pylon**: Fixed address `0x0000000000000000000000000000000000000042` - reads state from Celo synchronously
-4. **HumanNFT on Pylon**: Uses the proxy to verify attestations during minting
+2. **SettlementForwardingProxy on Human appchain**: Deployed on Human appchain, forwards calls to Settlement Port
+3. **Settlement Port on Human appchain**: Fixed address `0x0000000000000000000000000000000000000042` - reads state from Celo synchronously via Pylon
+4. **HumanNFT on Human appchain**: Uses the proxy to verify attestations during minting
 
-The beauty of this architecture is that from the HumanNFT contract's perspective, it's just calling a local contract (the proxy), but the data is actually being read from Celo in real-time!
+From the HumanNFT contract's perspective, it calls a local contract (the proxy), but the data is actually being read from Celo synchronously.
 
-**Pylon Network Status**: You can verify the Pylon network is operational at [https://pylon.celo-mainnet.spire.dev/_status/ready](https://pylon.celo-mainnet.spire.dev/_status/ready)
+**Human Appchain Status**: You can verify the Human appchain is operational at [https://pylon.celo-mainnet.spire.dev/_status/ready](https://pylon.celo-mainnet.spire.dev/_status/ready)
 
 ### Address Casing for Self Protocol
 
@@ -435,32 +433,24 @@ export PROOF_OF_HUMAN_ADDRESS=$(cast to-check-sum-address 0xf3d2672c6321311e4e76
 
 **Solution**: Ensure you have set the Scope on the ProofOfHuman contract and that the casing matches between the frontend and contract deployment.
 
-### Signature Generation Issues
-
-**Solutions**:
-1. Ensure wallet is connected and address is available
-2. Check wallet permissions for message signing
-3. Verify network connection
-4. Refresh page if wallet state gets stuck
-
 ### Minting Issues
 
 **If minting fails, check**:
 1. **Attestation completed on Celo**: Complete the attestation process using frontend first
-2. **Connected to correct network**: Ensure your wallet is connected to Pylon (chain ID 2139)
-3. **Settlement proxy deployed**: The SettlementForwardingProxy must be deployed on Pylon
-4. **Cross-chain read working**: The settlement mechanism must be able to read from Celo
+2. **Connected to correct network**: Ensure your wallet is connected to Human appchain (chain ID 2139)
+3. **Settlement proxy deployed**: The SettlementForwardingProxy must be deployed on Human appchain
+4. **Cross-chain read working**: Pylon must be able to read from Celo
 
 **Debug Steps**:
 ```bash
 # Check environment variables
-echo "HumanNFT Address (Pylon): $HUMAN_NFT_ADDRESS"
+echo "HumanNFT Address (Human appchain): $HUMAN_NFT_ADDRESS"
 echo "ProofOfHuman Address (Celo): $PROOF_OF_HUMAN_ADDRESS"
-echo "Pylon RPC: $PYLON_RPC_URL"
+echo "Human appchain RPC: $PYLON_RPC_URL"
 echo "Celo RPC: $CELO_RPC_URL"
 
 # Verify contracts exist
-echo "Checking HumanNFT on Pylon..."
+echo "Checking HumanNFT on Human appchain..."
 cast code $HUMAN_NFT_ADDRESS --rpc-url $PYLON_RPC_URL
 
 echo "Checking ProofOfHuman on Celo..."
@@ -474,15 +464,15 @@ cast call $PROOF_OF_HUMAN_ADDRESS \
 ```
 
 **Solutions**:
-1. **Complete attestation first**: Use frontend on Celo to generate and submit proof
-2. **Switch to Pylon network**: In your wallet, add and switch to Pylon chain (2139)
-3. **Verify settlement setup**: Ensure `PYLON_SETTLEMENT_PORT` is set correctly
-4. **Check proxy configuration**: The HumanNFT should point to the SettlementForwardingProxy
+1. **Complete attestation on Celo**: Use the frontend to generate and submit proof on Celo before attempting to mint
+2. **Verify network connection**: Ensure your wallet is connected to Human appchain (chain ID 2139)
+3. **Check contract deployment**: Verify SettlementForwardingProxy and HumanNFT are deployed on Human appchain
+4. **Verify cross-chain configuration**: Ensure `PYLON_SETTLEMENT_PORT` is set to `0x0000000000000000000000000000000000000042` and ProofOfHuman address is correctly configured in the proxy
 
 ### Cross-Chain Read Issues
 
-**If the settlement read fails**:
-1. **Settlement Port address**: Should be `0x0000000000000000000000000000000000000042` (fixed address)
-2. **Network connectivity**: Ensure both Celo and Pylon RPCs are accessible
-3. **Contract addresses**: Verify ProofOfHuman address is correctly set in the proxy
-4. **Pylon status**: Check [https://pylon.celo-mainnet.spire.dev/_status/ready](https://pylon.celo-mainnet.spire.dev/_status/ready) to verify Pylon is operational
+**If the cross-chain read fails**:
+1. **Settlement Port address**: Verify it's set to `0x0000000000000000000000000000000000000042` (fixed address on all Human appchains)
+2. **Network connectivity**: Ensure both Celo and Human appchain RPC endpoints are accessible
+3. **Contract configuration**: Verify ProofOfHuman address is correctly set in the SettlementForwardingProxy
+4. **Human appchain status**: Check [https://pylon.celo-mainnet.spire.dev/_status/ready](https://pylon.celo-mainnet.spire.dev/_status/ready) to verify Human appchain is operational
