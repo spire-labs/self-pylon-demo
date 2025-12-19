@@ -284,7 +284,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
           <div className={stepTwoStyles.successBanner}>
             <div className={stepTwoStyles.successTitle}>
               <Image
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_fail.svg`}
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/verify/check_success.svg`}
                 alt="check"
                 width={9.4}
                 height={10.3}
