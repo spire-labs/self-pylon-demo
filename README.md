@@ -1,6 +1,6 @@
 # Self ↔ Pylon Demo
 
-A fully on-chain, privacy-preserving identity attestation system using the Self protocol and Human appchain with **true cross-chain architecture**.
+A fully on-chain, privacy-preserving identity attestation system using the Self protocol and Human appchain with **true cross-chain architecture** powered by [Spire's Pylon](https://docs.spire.dev/pylon/).
 
 ## Frontend
 
@@ -109,7 +109,9 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
 # Start frontend
-pnpm --filter frontend dev
+pushd frontend
+pnpm dev
+popd
 ```
 
 **Note**: The existing deployment uses the cross-chain architecture where attestations are on Celo and claims happen on Human appchain via Pylon.
@@ -329,7 +331,9 @@ By default, the app runs with an empty basePath (for custom domain deployment). 
 ```bash
 # Start frontend (complete flow in one app)
 # Access at: http://localhost:3000/
-pnpm --filter frontend dev
+pushd frontend
+pnpm dev
+popd
 ```
 
 **Custom Base Path**
@@ -342,7 +346,9 @@ export NEXT_PUBLIC_BASE_PATH="/self-pylon-demo"
 
 # Start the dev server
 # Access at: http://localhost:3000/self-pylon-demo/
-pnpm --filter frontend dev
+pushd frontend
+pnpm dev
+popd
 ```
 
 **Important**: When running locally with a basePath, you must access the app at `http://localhost:PORT/basePath/` (not at the root). All assets and routes will be prefixed with the basePath. If basePath is empty, access the app at the root URL.
@@ -402,7 +408,7 @@ Your unified app will be available at:
 
 ### Cross-Chain Architecture
 
-This demo uses **Pylon** for synchronous cross-chain reads:
+This demo uses **[Pylon](https://docs.spire.dev/pylon/)** for synchronous cross-chain reads:
 
 1. **ProofOfHuman on Celo**: Stores attestations on Celo mainnet
 2. **SettlementForwardingProxy on Human appchain**: Deployed on Human appchain, forwards calls to Settlement Port

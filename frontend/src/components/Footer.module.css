@@ -20,3 +20,14 @@
   opacity: 0.78;
 }
 
+.link {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.link:hover {
+  opacity: 1;
+}
+

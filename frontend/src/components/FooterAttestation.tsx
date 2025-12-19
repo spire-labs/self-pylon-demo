@@ -33,6 +33,16 @@ export default function FooterAttestation({ contractAddress }: FooterAttestation
           After generating a proof in Self, it will be automatically submitted
           on-chain to verify your humanity.
         </div>
+        <div className={styles.right}>
+          <a
+            href="https://github.com/spire-labs/self-pylon-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.contractLink}
+          >
+            View source code
+          </a>
+        </div>
       </div>
 
       <div className={styles.mobileText}>
@@ -55,6 +65,16 @@ export default function FooterAttestation({ contractAddress }: FooterAttestation
         <div className={styles.mobile}>
           After generating a proof in Self, it will be automatically submitted
           on-chain to verify your humanity.
+        </div>
+        <div className={styles.mobile}>
+          <a
+            href="https://github.com/spire-labs/self-pylon-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.contractLink}
+          >
+            View source code
+          </a>
         </div>
       </div>
     </div>

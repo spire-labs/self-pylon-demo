@@ -50,6 +50,11 @@
   white-space: nowrap;
 }
 
+.desktopText .right {
+  margin-left: auto;
+  text-align: right;
+}
+
 .mobileText {
   display: none;
 }
