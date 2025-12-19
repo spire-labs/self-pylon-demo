@@ -109,9 +109,7 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 EOF
 
 # Start frontend
-pushd frontend
-pnpm dev
-popd
+pnpm --filter frontend dev
 ```
 
 **Note**: The existing deployment uses the cross-chain architecture where attestations are on Celo and claims happen on Human appchain via Pylon.
@@ -321,6 +319,7 @@ echo "   - frontend supports both Celo (chain $CELO_CHAIN_ID) and Human appchain
 echo "   - Complete flow: attestation → NFT minting"
 
 # Build the frontend
+# Note: For deployment using GitHub Pages, use ./scripts/build-frontend.sh
 pnpm --filter frontend build
 ```
 
@@ -331,9 +330,7 @@ By default, the app runs with an empty basePath (for custom domain deployment). 
 ```bash
 # Start frontend (complete flow in one app)
 # Access at: http://localhost:3000/
-pushd frontend
-pnpm dev
-popd
+pnpm --filter frontend dev
 ```
 
 **Custom Base Path**
@@ -346,9 +343,7 @@ export NEXT_PUBLIC_BASE_PATH="/self-pylon-demo"
 
 # Start the dev server
 # Access at: http://localhost:3000/self-pylon-demo/
-pushd frontend
-pnpm dev
-popd
+pnpm --filter frontend dev
 ```
 
 **Important**: When running locally with a basePath, you must access the app at `http://localhost:PORT/basePath/` (not at the root). All assets and routes will be prefixed with the basePath. If basePath is empty, access the app at the root URL.
