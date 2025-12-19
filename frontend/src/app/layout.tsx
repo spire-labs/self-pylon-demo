@@ -16,9 +16,9 @@ export const metadata: Metadata = {
     siteName: 'Human NFT',
     images: [
       {
-        url: `${basePath}/mountains.svg`,
-        width: 1440,
-        height: 800,
+        url: `${siteUrl}${basePath}/og-image.png`,
+        width: 1200,
+        height: 630,
         alt: 'Human NFT - Claim your "I am human" NFT',
       },
     ],
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Human NFT',
     description: 'Claim your Human NFT - Mint your "I am human" NFT on Pylon appchain',
-    images: [`${basePath}/mountains.svg`],
+    images: [`${siteUrl}${basePath}/og-image.png`],
   },
 };
 

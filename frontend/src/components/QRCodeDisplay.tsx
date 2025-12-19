@@ -12,7 +12,7 @@ type QRCodeDisplayProps = {
 
 // App download links from self.xyz/resources
 const APP_STORE_LINK = 'https://apps.apple.com/in/app/self-zk/id6478563710';
-const PLAY_STORE_LINK = 'https://play.google.com/store/apps/details?id=com.self.app';
+const PLAY_STORE_LINK = 'https://play.google.com/store/apps/details?id=com.proofofpassportapp';
 
 function QRCodeDisplayInner({ address, signature, onProofVerified }: QRCodeDisplayProps) {
   // Detect user's device to link to appropriate app store
