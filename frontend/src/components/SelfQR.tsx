@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAccount, useSignMessage, usePublicClient, useSwitchChain } from 'wagmi';
 import { celo } from '../chains/celo';
 import { fromSuccessEvent } from '@self-pylon-demo/self-adapter';
-import { detectWalletBrowser, buildWalletCallbackUrl } from '../lib/walletDetection';
+import { detectWalletBrowser, buildWalletCallbackUrl, shouldDisableUniversalLinks } from '../lib/walletDetection';
 
 // Import Self QR components (package must be installed in the app workspace)
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -440,7 +440,7 @@ function Inner({ address, signature: signatureProp, onProofVerified }: Props) {
     <div>
       {effectiveSignature && selfApp ? (
         <div style={{ marginBottom: 16 }}>
-          {isMobile && universalLink && (
+          {isMobile && universalLink && !shouldDisableUniversalLinks() && (
             <div
               style={{
                 marginBottom: 12,

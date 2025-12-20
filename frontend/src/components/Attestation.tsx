@@ -10,6 +10,8 @@ import successStyles from './SuccessCard.module.css';
 import errorStyles from './ErrorCard.module.css';
 import buttonStyles from './ui/Button.module.css';
 import QRCodeDisplay from './QRCodeDisplay';
+import { isZeroSignature, isValidSignature } from '../lib/signatureValidation';
+import { getWalletCompatibilityInfo } from '../lib/walletDetection';
 
 type AttestationState = 'step1' | 'step2' | 'success' | 'error';
 
@@ -30,6 +32,7 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
   const [shouldPoll, setShouldPoll] = useState(false);
   const [lockSuccess, setLockSuccess] = useState(false);
   const [isAlreadyVerified, setIsAlreadyVerified] = useState<boolean | null>(null); // null = checking, true/false = result
+  const [signatureError, setSignatureError] = useState<string | null>(null);
   const previousAddressRef = useRef<string | undefined>(undefined);
 
   const effectiveAddress = address || connectedAddress;
@@ -42,12 +45,14 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
     // Clear signature if address changed or disconnected
     if (prevAddress !== undefined && prevAddress !== effectiveAddress) {
       setSignature('');
+      setSignatureError(null);
       if (state !== 'step1') {
         setState('step1');
       }
     } else if (!effectiveAddress) {
       // No address connected, clear signature
       setSignature('');
+      setSignatureError(null);
       if (state !== 'step1') {
         setState('step1');
       }
@@ -193,17 +198,38 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
     try {
       setLockSuccess(false);
       setShouldPoll(false);
-      // Clear any existing signature before generating a new one
+      // Clear any existing signature and error before generating a new one
       setSignature('');
+      setSignatureError(null);
       
       const message = `I confirm that both this passport and public address ${effectiveAddress.toLowerCase()} are owned by me`;
       const sig = await signMessageAsync({ message });
+      
+      // Immediately validate the signature
+      if (isZeroSignature(sig) || !isValidSignature(sig)) {
+        // Signature is invalid, check if it's a smart wallet
+        const compatibilityInfo = await getWalletCompatibilityInfo(effectiveAddress, publicClient);
+        
+        if (compatibilityInfo.isSmartWallet) {
+          setSignatureError(compatibilityInfo.errorMessage);
+        } else {
+          // General EIP-191 compatibility issue
+          setSignatureError('The wallet did not generate a valid EIP-191 signature. Please try again or use a different wallet that supports EIP-191 signing (like MetaMask, Coinbase Wallet, or Trust Wallet).');
+        }
+        
+        // Clear invalid signature and stay on step1
+        setSignature('');
+        return;
+      }
+      
+      // Signature is valid, proceed to step2
       setSignature(sig);
       setState('step2');
     } catch (error) {
       console.error('Error generating signature:', error);
       // Clear signature on error
       setSignature('');
+      setSignatureError('Failed to generate signature. Please try again.');
     }
   };
 
@@ -235,6 +261,22 @@ export default function Attestation({ address, onSuccess, initialState }: Attest
             textAlign: 'center'
           }}>
             ⚠️ This address has already been verified. You can attempt the process again, but it will fail because each address can only be associated with one passport.
+          </div>
+        )}
+
+        {signatureError && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            backgroundColor: '#fee2e2',
+            borderRadius: '4px',
+            fontFamily: '"Work Sans", sans-serif',
+            fontSize: '14px',
+            color: '#991b1b',
+            textAlign: 'center',
+            lineHeight: '1.5'
+          }}>
+            ⚠️ {signatureError}
           </div>
         )}
 
