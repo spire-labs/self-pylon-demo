@@ -13,7 +13,10 @@ contract SeedHumanNFT is Script {
         string memory inputPath = vm.envString("SEED_INPUT");
         string memory json = vm.readFile(inputPath);
         uint256 batchCount = json.readUint(".batchCount");
-        uint256 finalize = vm.envOr("FINALIZE_MIGRATION", uint256(0));
+        uint256 finalize = vm.envOr("FINALIZE_SEEDING", uint256(0));
+        if (finalize == 0) {
+            finalize = vm.envOr("FINALIZE_MIGRATION", uint256(0));
+        }
         uint256 finalizeOnly = vm.envOr("FINALIZE_ONLY", uint256(0));
 
         vm.startBroadcast();
@@ -31,7 +34,7 @@ contract SeedHumanNFT is Script {
         }
 
         if (finalize == 1) {
-            nft.completeMigration();
+            nft.completeSeeding();
         }
         vm.stopBroadcast();
     }

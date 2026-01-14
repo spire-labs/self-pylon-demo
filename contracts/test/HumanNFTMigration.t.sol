@@ -66,12 +66,12 @@ contract HumanNFTMigrationTest is Test {
     }
 
     function testMintRequiresMigrationComplete() public {
-        vm.expectRevert(bytes("Migration not complete"));
+        vm.expectRevert(bytes("Seeding not complete"));
         nft.mint();
     }
 
     function testCompleteMigrationBlocksFurtherSeeding() public {
-        nft.completeMigration();
+        nft.completeSeeding();
 
         address[] memory owners = new address[](1);
         owners[0] = address(0x1111);
@@ -82,7 +82,7 @@ contract HumanNFTMigrationTest is Test {
         uint256[] memory nullifiers = new uint256[](1);
         nullifiers[0] = 123;
 
-        vm.expectRevert(bytes("Migration complete"));
+        vm.expectRevert(bytes("Seeding complete"));
         nft.seedMints(owners, tokenIds, nullifiers);
     }
 }
