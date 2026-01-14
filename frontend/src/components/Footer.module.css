@@ -25,9 +25,6 @@
   text-decoration: underline;
   cursor: pointer;
   transition: opacity 0.2s;
-}
-
-.link:hover {
+}.link:hover {
   opacity: 1;
 }
-

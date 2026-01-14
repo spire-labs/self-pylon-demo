@@ -72,3 +72,4 @@ export function validateSignatureFormat(signature: string): string | null {
   
   return null;
 }
+

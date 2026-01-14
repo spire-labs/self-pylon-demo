@@ -9,6 +9,7 @@ remappings = [
     "@selfxyz/=lib/selfxyz-contracts/",
     "@openzeppelin/=lib/openzeppelin-contracts/"
 ]
+fs_permissions = [{ access = "read", path = "../" }]
 
 [rpc_endpoints]
 celo_l2 = "${CELO_L2_RPC_URL}"
