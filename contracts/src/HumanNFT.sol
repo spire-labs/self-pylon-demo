@@ -12,6 +12,7 @@ interface IProofOfHuman {
 
 contract HumanNFT is ERC721, Ownable {
     uint256 public nextId = 1;
+    bool public seedingComplete;
     mapping(uint256 => bool) public nullifierMinted; // Track which nullifiers have been used
     
     // ProofOfHuman contract address (can be direct contract if deployed on the same chain or a SettlementForwardingProxy if deployed on pylon)
@@ -20,6 +21,8 @@ contract HumanNFT is ERC721, Ownable {
     // Events
     event ProofOfHumanContractUpdated(address indexed oldContract, address indexed newContract);
     event HumanVerified(address indexed user, uint256 indexed tokenId, uint256 nullifier);
+    event Seeded(uint256 count, uint256 maxTokenId);
+    event SeedingCompleted();
 
     constructor(address _proofOfHumanContract) ERC721("I Am Human", "HUMAN") Ownable(msg.sender) {
         require(_proofOfHumanContract != address(0), "Invalid ProofOfHuman contract address");
@@ -77,6 +80,7 @@ contract HumanNFT is ERC721, Ownable {
     }
     
     function mint() external {
+        require(seedingComplete, "Seeding not complete");
         // Get the nullifier for this address from ProofOfHuman contract
         uint256 nullifier = _getNullifier(msg.sender);
         
@@ -92,6 +96,49 @@ contract HumanNFT is ERC721, Ownable {
         _mint(msg.sender, tokenId);
         
         emit HumanVerified(msg.sender, tokenId, nullifier);
+    }
+
+    function seedMints(
+        address[] calldata owners,
+        uint256[] calldata tokenIds,
+        uint256[] calldata nullifiers
+    ) external onlyOwner {
+        require(!seedingComplete, "Seeding complete");
+        require(
+            owners.length == tokenIds.length && owners.length == nullifiers.length,
+            "Array length mismatch"
+        );
+
+        uint256 updatedNextId = nextId;
+        for (uint256 i = 0; i < owners.length; i++) {
+            address owner = owners[i];
+            uint256 tokenId = tokenIds[i];
+            uint256 nullifier = nullifiers[i];
+
+            require(owner != address(0), "Invalid owner");
+            require(tokenId != 0, "Invalid tokenId");
+            require(nullifier != 0, "Invalid nullifier");
+            require(!nullifierMinted[nullifier], "Nullifier already used");
+
+            nullifierMinted[nullifier] = true;
+            _mint(owner, tokenId);
+
+            if (tokenId >= updatedNextId) {
+                updatedNextId = tokenId + 1;
+            }
+        }
+
+        if (updatedNextId != nextId) {
+            nextId = updatedNextId;
+        }
+
+        emit Seeded(owners.length, updatedNextId > 0 ? updatedNextId - 1 : 0);
+    }
+
+    function completeSeeding() external onlyOwner {
+        require(!seedingComplete, "Seeding complete");
+        seedingComplete = true;
+        emit SeedingCompleted();
     }
     
     // Override tokenURI to provide custom metadata
