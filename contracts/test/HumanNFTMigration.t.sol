@@ -8,7 +8,7 @@ contract HumanNFTMigrationTest is Test {
     HumanNFT private nft;
 
     function setUp() public {
-        nft = new HumanNFT(address(0x1234));
+        nft = new HumanNFT(address(0x1234), address(this));
     }
 
     function testSeedMintsSetsStateAndNextId() public {

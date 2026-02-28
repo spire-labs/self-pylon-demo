@@ -28,3 +28,5 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Snapshot artifacts (keep the baseline `snapshot-human-nft.json` tracked)
+snapshot-human-nft.*.json

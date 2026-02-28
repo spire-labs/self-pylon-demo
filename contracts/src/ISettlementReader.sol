@@ -2,5 +2,5 @@
 pragma solidity ^0.8.24;
 
 interface ISettlementReader {
-    function readSettlement(address target, bytes calldata callData) external view returns (bytes memory);
+    function crosschainRead(address _to, bytes calldata _data) external view returns (bytes memory);
 }

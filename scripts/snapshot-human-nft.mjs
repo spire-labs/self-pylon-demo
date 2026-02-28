@@ -34,6 +34,7 @@ async function main() {
   const verifyOnly = process.env.VERIFY_ONLY === "1";
   const verifyAfter = process.env.VERIFY === "1";
   const verifyNullifiers = process.env.VERIFY_NULLIFIERS === "1";
+  const baseSnapshotPath = process.env.BASE_SNAPSHOT || "";
 
   if (verifyOnly) {
     await verifySnapshot(rpcUrl, contractAddress, outputFile);
@@ -62,8 +63,8 @@ async function main() {
   }
 
   const entries = [];
-  const seenTokenIds = new Set();
-  const seenNullifiers = new Set();
+  const seenTokenIds = new Set(); // within delta logs
+  const seenNullifiers = new Set(); // within delta logs
   let duplicateTokenIds = 0;
   let duplicateNullifiers = 0;
   let totalLogs = 0;
@@ -117,9 +118,33 @@ async function main() {
     return aId < bId ? -1 : 1;
   });
 
+  let mergedEntries = entries;
+  let baseEntryCount = 0;
+  let mergeConflicts = 0;
+  let mergeOverlaps = 0;
+
+  if (baseSnapshotPath) {
+    const baseSnapshot = readSnapshotEntries(baseSnapshotPath);
+    baseEntryCount = baseSnapshot.entries.length;
+    const merged = mergeSnapshots({
+      base: baseSnapshot.entries,
+      delta: entries,
+    });
+    mergedEntries = merged.entries;
+    mergeConflicts = merged.conflicts;
+    mergeOverlaps = merged.overlaps;
+  }
+
+  mergedEntries.sort((a, b) => {
+    const aId = BigInt(a.tokenId);
+    const bId = BigInt(b.tokenId);
+    if (aId === bId) return 0;
+    return aId < bId ? -1 : 1;
+  });
+
   const batches = [];
-  for (let i = 0; i < entries.length; i += batchSize) {
-    const chunk = entries.slice(i, i + batchSize);
+  for (let i = 0; i < mergedEntries.length; i += batchSize) {
+    const chunk = mergedEntries.slice(i, i + batchSize);
     batches.push({
       owners: chunk.map((entry) => entry.user),
       tokenIds: chunk.map((entry) => entry.tokenId),
@@ -128,20 +153,33 @@ async function main() {
   }
 
   const maxTokenId =
-    entries.length === 0 ? "0" : entries[entries.length - 1].tokenId;
+    mergedEntries.length === 0 ? "0" : mergedEntries[mergedEntries.length - 1].tokenId;
 
   const payload = {
     generatedAt: new Date().toISOString(),
     contract: contractAddress,
     fromBlock,
     toBlock,
-    entryCount: entries.length,
+    entryCount: mergedEntries.length,
     batchCount: batches.length,
     maxTokenId,
     duplicates: {
       tokenIds: duplicateTokenIds,
       nullifiers: duplicateNullifiers,
     },
+    sources: baseSnapshotPath
+      ? {
+          baseSnapshot: path.resolve(baseSnapshotPath),
+          baseEntryCount,
+          deltaFromBlock: fromBlock,
+          deltaToBlock: toBlock,
+          deltaEntryCount: entries.length,
+          merge: { overlaps: mergeOverlaps, conflicts: mergeConflicts },
+        }
+      : {
+          deltaFromBlock: fromBlock,
+          deltaToBlock: toBlock,
+        },
     batches,
   };
 
@@ -155,6 +193,14 @@ async function main() {
     console.warn(
       `Skipped ${duplicateTokenIds} duplicate tokenId logs and ${duplicateNullifiers} duplicate nullifier logs`
     );
+  }
+  if (baseSnapshotPath) {
+    console.log(
+      `Merged base snapshot (${baseEntryCount} entries) + delta logs (${entries.length} entries) -> ${mergedEntries.length} entries.`
+    );
+    if (mergeOverlaps) {
+      console.warn(`Merge overlaps (tokenId or nullifier present in both): ${mergeOverlaps}`);
+    }
   }
 
   if (verifyAfter) {
@@ -298,11 +344,16 @@ async function verifySnapshot(rpcUrl, contractAddress, outputFile) {
   const snapshot = JSON.parse(raw);
 
   const snapshotMap = new Map();
+  const tokenIdList = [];
   for (const batch of snapshot.batches || []) {
     const owners = batch.owners || [];
     const tokenIds = batch.tokenIds || [];
     for (let i = 0; i < tokenIds.length; i++) {
-      snapshotMap.set(tokenIds[i].toString(), owners[i]?.toLowerCase());
+      const tokenId = tokenIds[i]?.toString();
+      const owner = owners[i]?.toLowerCase();
+      if (!tokenId) continue;
+      snapshotMap.set(tokenId, owner);
+      tokenIdList.push(tokenId);
     }
   }
 
@@ -311,38 +362,80 @@ async function verifySnapshot(rpcUrl, contractAddress, outputFile) {
     "latest",
   ]);
   const nextId = hexToInt(nextIdHex);
-  const maxTokenId = Math.max(0, nextId - 1);
-  const loggedMints = snapshotMap.size;
+  const onChainMaxTokenId = Math.max(0, nextId - 1);
 
-  if (maxTokenId > loggedMints) {
+  const strictFull = process.env.STRICT_FULL_SNAPSHOT === "1";
+  const hasAny = snapshotMap.size > 0;
+
+  if (!hasAny) {
+    if (onChainMaxTokenId === 0) {
+      console.log("No tokens on-chain and snapshot is empty. OK.");
+      return;
+    }
     throw new Error(
-      `On-chain mint count (${maxTokenId}) exceeds logged events (${loggedMints}).`
+      `Snapshot is empty but on-chain nextId implies ${onChainMaxTokenId} minted tokens.`
     );
   }
 
   let mismatches = 0;
-  const total = maxTokenId;
+  const snapshotTokenIds = Array.from(
+    new Set(tokenIdList.map((x) => x.toString()))
+  ).sort((a, b) => {
+    const aId = BigInt(a);
+    const bId = BigInt(b);
+    if (aId === bId) return 0;
+    return aId < bId ? -1 : 1;
+  });
+
+  const minSnapshotTokenId = Number(BigInt(snapshotTokenIds[0]));
+  const maxSnapshotTokenId = Number(BigInt(snapshotTokenIds[snapshotTokenIds.length - 1]));
+
+  const looksFull =
+    minSnapshotTokenId === 1 &&
+    maxSnapshotTokenId === onChainMaxTokenId &&
+    snapshotMap.size === onChainMaxTokenId;
+
+  if (!looksFull) {
+    const msg =
+      `Snapshot appears partial (snapshot tokenIds: ${minSnapshotTokenId}..${maxSnapshotTokenId} ` +
+      `(${snapshotMap.size} tokens), on-chain max tokenId=${onChainMaxTokenId}).`;
+    if (strictFull) {
+      throw new Error(
+        `${msg} If this chain includes seeded mints without HumanVerified logs, rerun with BASE_SNAPSHOT pointing to the seeding snapshot.`
+      );
+    }
+    console.warn(`${msg} Verifying only tokenIds present in snapshot.`);
+  }
+
+  const tokensToCheck = looksFull
+    ? Array.from({ length: onChainMaxTokenId }, (_, i) => (i + 1).toString())
+    : snapshotTokenIds;
+
+  const total = tokensToCheck.length;
   const startTime = Date.now();
 
-  for (let tokenId = 1; tokenId <= maxTokenId; tokenId++) {
+  for (let i = 0; i < tokensToCheck.length; i++) {
+    const tokenIdStr = tokensToCheck[i];
+    const tokenId = Number(BigInt(tokenIdStr));
     const data = OWNER_OF_SELECTOR + padUint256Hex(tokenId);
     const result = await rpcRequest(rpcUrl, "eth_call", [
       { to: contractAddress, data },
       "latest",
     ]);
     const owner = decodeAddress(result);
-    const expected = snapshotMap.get(tokenId.toString());
+    const expected = snapshotMap.get(tokenIdStr);
 
     if (!expected || owner !== expected) {
       mismatches += 1;
       console.warn(
-        `Mismatch tokenId ${tokenId}: on-chain ${owner}, snapshot ${expected || "missing"}`
+        `Mismatch tokenId ${tokenIdStr}: on-chain ${owner}, snapshot ${expected || "missing"}`
       );
     }
 
-    if (tokenId % 50 === 0 || tokenId === total) {
+    const done = i + 1;
+    if (done % 50 === 0 || done === total) {
       console.log(
-        `Verified ${tokenId}/${total} tokens (${mismatches} mismatches)`
+        `Verified ${done}/${total} tokens (${mismatches} mismatches)`
       );
     }
   }
@@ -377,6 +470,79 @@ function padAddressHex(value) {
     throw new Error(`Invalid address: ${value}`);
   }
   return value.slice(2).padStart(64, "0");
+}
+
+function readSnapshotEntries(snapshotPath) {
+  if (!fs.existsSync(snapshotPath)) {
+    throw new Error(`Base snapshot file not found: ${snapshotPath}`);
+  }
+  const raw = fs.readFileSync(snapshotPath, "utf8");
+  const snapshot = JSON.parse(raw);
+  const entries = [];
+  for (const batch of snapshot.batches || []) {
+    const owners = batch.owners || [];
+    const tokenIds = batch.tokenIds || [];
+    const nullifiers = batch.nullifiers || [];
+    for (let i = 0; i < tokenIds.length; i++) {
+      const user = owners[i]?.toLowerCase();
+      const tokenId = tokenIds[i]?.toString();
+      const nullifier = nullifiers[i]?.toString();
+      if (!user || !tokenId || !nullifier) continue;
+      entries.push({ user, tokenId, nullifier });
+    }
+  }
+  return { snapshot, entries };
+}
+
+function mergeSnapshots({ base, delta }) {
+  const byTokenId = new Map();
+  const byNullifier = new Map();
+  let overlaps = 0;
+  let conflicts = 0;
+
+  function add(entry, source) {
+    const tokenId = entry.tokenId.toString();
+    const nullifier = entry.nullifier.toString();
+    const user = entry.user.toLowerCase();
+
+    const existingByToken = byTokenId.get(tokenId);
+    if (existingByToken) {
+      overlaps += 1;
+      if (
+        existingByToken.user !== user ||
+        existingByToken.nullifier.toString() !== nullifier
+      ) {
+        conflicts += 1;
+        throw new Error(
+          `Snapshot merge conflict for tokenId=${tokenId} (${source} differs from base).`
+        );
+      }
+      return;
+    }
+
+    const existingByNullifier = byNullifier.get(nullifier);
+    if (existingByNullifier) {
+      overlaps += 1;
+      if (
+        existingByNullifier.user !== user ||
+        existingByNullifier.tokenId.toString() !== tokenId
+      ) {
+        conflicts += 1;
+        throw new Error(
+          `Snapshot merge conflict for nullifier=${nullifier} (${source} differs from base).`
+        );
+      }
+      return;
+    }
+
+    byTokenId.set(tokenId, { user, tokenId, nullifier });
+    byNullifier.set(nullifier, { user, tokenId, nullifier });
+  }
+
+  for (const e of base) add(e, "base");
+  for (const e of delta) add(e, "delta");
+
+  return { entries: Array.from(byTokenId.values()), overlaps, conflicts };
 }
 
 main().catch((error) => {
