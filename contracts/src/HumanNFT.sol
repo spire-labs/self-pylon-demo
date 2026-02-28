@@ -24,8 +24,9 @@ contract HumanNFT is ERC721, Ownable {
     event Seeded(uint256 count, uint256 maxTokenId);
     event SeedingCompleted();
 
-    constructor(address _proofOfHumanContract) ERC721("I Am Human", "HUMAN") Ownable(msg.sender) {
+    constructor(address _proofOfHumanContract, address initialOwner) ERC721("I Am Human", "HUMAN") Ownable(initialOwner) {
         require(_proofOfHumanContract != address(0), "Invalid ProofOfHuman contract address");
+        require(initialOwner != address(0), "Invalid owner");
         proofOfHumanContract = _proofOfHumanContract;
     }
     
@@ -171,4 +172,3 @@ contract HumanNFT is ERC721, Ownable {
             '</svg>';
     }
 }
-

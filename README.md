@@ -89,12 +89,12 @@ export PROOF_OF_HUMAN_ADDRESS=0x5E05a5CCf9fe3EC0a4b602A56381D685D0f711a8
 # Human appchain configuration
 export PYLON_RPC_URL=https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc
 export PYLON_CHAIN_ID=2139
-export PYLON_SETTLEMENT_PORT=0x0000000000000000000000000000000000000042
+export PYLON_APPCHAIN_PORT=0x0000000000000000000000000000000000000043
 # Celo contract address
 # export HUMAN_NFT_ADDRESS=0xE95515970B457130B5D891666e02ABBA49c84448
 # Human appchain contract addresses
-export SETTLEMENT_FORWARDING_PROXY=0x5234cc99A4197525b8550E17d02b25F0D00D10B9
-export HUMAN_NFT_ADDRESS=0xF54a6f384d88afB9c9b48fa9979BBdf445B8eC6D
+export SETTLEMENT_FORWARDING_PROXY=0x165F103493963321596Aabf028EDB972Db724257
+export HUMAN_NFT_ADDRESS=0x51AF8BA13f0954f62b60EbB4167164caD7621aAE
 
 # Configure frontend
 cat > frontend/.env.local << EOF
@@ -149,8 +149,9 @@ export CELO_CHAIN_ID=42220
 export PYLON_RPC_URL="https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc"
 export PYLON_CHAIN_ID=2139
 
-# Pylon settlement port - enables cross-chain reads from Celo
-export PYLON_SETTLEMENT_PORT="0x0000000000000000000000000000000000000042"
+# Pylon appchain crosschain port - enables cross-chain reads from Celo
+# Modern Pylon chains use the consolidated AppchainPort preinstall at 0x...0043.
+export PYLON_APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
 
 # Self Hub contract (official Self contract on Celo)
 export SELF_HUB_ADDRESS=0xe57F4773bd9c9d8b6Cd70431117d353298B9f5BF
@@ -166,7 +167,7 @@ cast block-number --rpc-url $PYLON_RPC_URL
 cast chain-id --rpc-url $PYLON_RPC_URL  # Should return: 2139
 
 # Verify settlement port contract exists
-cast code $PYLON_SETTLEMENT_PORT --rpc-url $PYLON_RPC_URL
+cast code $PYLON_APPCHAIN_PORT --rpc-url $PYLON_RPC_URL
 
 # Verify Pylon is synced with Celo
 curl -s https://pylon.celo-mainnet.spire.dev/_status/ready | jq
@@ -273,10 +274,12 @@ Skip to section 4 if using our existing HumanNFT contract.
 **Important**: This deployment creates both the SettlementForwardingProxy and HumanNFT on Human appchain. The proxy enables cross-chain reads from Celo via Pylon.
 
 ```bash
-export PYLON_SETTLEMENT_PORT="0x0000000000000000000000000000000000000042"
+export PYLON_APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
+export HUMAN_NFT_OWNER=$(cast wallet address --private-key $SIGNER_PRIVATE_KEY)
 
 # Deploy on Human appchain (deploys both SettlementForwardingProxy and HumanNFT)
 pushd contracts
+./scripts/install-foundry-deps.sh
 forge script script/DeployPylon.s.sol:DeployPylon \
   --rpc-url $PYLON_RPC_URL \
   --broadcast \
@@ -301,6 +304,25 @@ echo "   - Attestations are stored on Celo: ${PROOF_OF_HUMAN_ADDRESS}"
 echo "   - Claims happen on Human appchain: $HUMAN_NFT_ADDRESS"
 echo "   - Settlement proxy on Human appchain: $PROOF_OF_HUMAN_PROXY"
 ```
+
+### 3c. Deterministic Redeploy After Appchain Reset (Recommended)
+
+If the Human appchain chain state is reset (fresh genesis / PVC wipe), you can redeploy `SettlementForwardingProxy` + `HumanNFT` to deterministic addresses using the preinstalled deterministic deployment proxy:
+
+```bash
+export PYLON_APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
+export HUMAN_NFT_OWNER=$(cast wallet address --private-key $SIGNER_PRIVATE_KEY)
+
+pushd contracts
+./scripts/install-foundry-deps.sh
+forge script script/DeployPylonDeterministic.s.sol:DeployPylonDeterministic \
+  --rpc-url $PYLON_RPC_URL \
+  --broadcast \
+  --private-key $SIGNER_PRIVATE_KEY
+popd
+```
+
+For the full production migration procedure (snapshot + seeding), see `docs/production-chain-reset-seeding-runbook.md`.
 
 ## 4. Configure Frontend
 
@@ -415,8 +437,8 @@ Your unified app will be available at:
 This demo uses **[Pylon](https://docs.spire.dev/pylon/)** for synchronous cross-chain reads:
 
 1. **ProofOfHuman on Celo**: Stores attestations on Celo mainnet
-2. **SettlementForwardingProxy on Human appchain**: Deployed on Human appchain, forwards calls to Settlement Port
-3. **Settlement Port on Human appchain**: Fixed address `0x0000000000000000000000000000000000000042` - reads state from Celo synchronously via Pylon
+2. **SettlementForwardingProxy on Human appchain**: Deployed on Human appchain, forwards calls to AppchainPort
+3. **AppchainPort on Human appchain**: Fixed address `0x0000000000000000000000000000000000000043` - cross-chain read façade (`crosschainRead`) used by the proxy
 4. **HumanNFT on Human appchain**: Uses the proxy to verify attestations during minting
 
 From the HumanNFT contract's perspective, it calls a local contract (the proxy), but the data is actually being read from Celo synchronously.
@@ -477,12 +499,12 @@ cast call $PROOF_OF_HUMAN_ADDRESS \
 1. **Complete attestation on Celo**: Use the frontend to generate and submit proof on Celo before attempting to mint
 2. **Verify network connection**: Ensure your wallet is connected to Human appchain (chain ID 2139)
 3. **Check contract deployment**: Verify SettlementForwardingProxy and HumanNFT are deployed on Human appchain
-4. **Verify cross-chain configuration**: Ensure `PYLON_SETTLEMENT_PORT` is set to `0x0000000000000000000000000000000000000042` and ProofOfHuman address is correctly configured in the proxy
+4. **Verify cross-chain configuration**: Ensure `PYLON_APPCHAIN_PORT` is set to `0x0000000000000000000000000000000000000043` and ProofOfHuman address is correctly configured in the proxy
 
 ### Cross-Chain Read Issues
 
 **If the cross-chain read fails**:
-1. **Settlement Port address**: Verify it's set to `0x0000000000000000000000000000000000000042` (fixed address on all Human appchains)
+1. **AppchainPort address**: Verify it's set to `0x0000000000000000000000000000000000000043` (fixed address on modern Human appchains)
 2. **Network connectivity**: Ensure both Celo and Human appchain RPC endpoints are accessible
 3. **Contract configuration**: Verify ProofOfHuman address is correctly set in the SettlementForwardingProxy
 4. **Human appchain status**: Check [https://pylon.celo-mainnet.spire.dev/_status/ready](https://pylon.celo-mainnet.spire.dev/_status/ready) to verify Human appchain is operational

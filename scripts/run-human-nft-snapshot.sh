@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs snapshot export + ownerOf verification + ProofOfHuman nullifier check.
 # Requires env vars: PYLON_RPC_URL, HUMAN_NFT_ADDRESS, CELO_RPC_URL, PROOF_OF_HUMAN_ADDRESS
-# Optional env vars: BLOCK_CHUNK (default 10000), OUT_FILE (default snapshot-human-nft.json)
+# Optional env vars: BLOCK_CHUNK (default 10000), OUT_FILE (default snapshot-human-nft.json), BASE_SNAPSHOT (merge base+delta)
 set -euo pipefail
 
 if [[ -z "${PYLON_RPC_URL:-}" ]]; then
@@ -26,6 +26,7 @@ fi
 
 BLOCK_CHUNK="${BLOCK_CHUNK:-10000}"
 OUT_FILE="${OUT_FILE:-snapshot-human-nft.json}"
+BASE_SNAPSHOT="${BASE_SNAPSHOT:-}"
 
 RPC_URL="$PYLON_RPC_URL" \
 HUMAN_NFT_ADDRESS="$HUMAN_NFT_ADDRESS" \
@@ -33,6 +34,8 @@ CELO_RPC_URL="$CELO_RPC_URL" \
 PROOF_OF_HUMAN_ADDRESS="$PROOF_OF_HUMAN_ADDRESS" \
 BLOCK_CHUNK="$BLOCK_CHUNK" \
 OUT_FILE="$OUT_FILE" \
+BASE_SNAPSHOT="$BASE_SNAPSHOT" \
+STRICT_FULL_SNAPSHOT=1 \
 VERIFY=1 \
 VERIFY_NULLIFIERS=1 \
 node scripts/snapshot-human-nft.mjs
