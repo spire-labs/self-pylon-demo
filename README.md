@@ -89,7 +89,7 @@ export PROOF_OF_HUMAN_ADDRESS=0x5E05a5CCf9fe3EC0a4b602A56381D685D0f711a8
 # Human appchain configuration
 export PYLON_RPC_URL=https://pylon.celo-mainnet.spire.dev/v1/chain/2139/rpc
 export PYLON_CHAIN_ID=2139
-export PYLON_APPCHAIN_PORT=0x0000000000000000000000000000000000000043
+export APPCHAIN_PORT=0x0000000000000000000000000000000000000043
 # Celo contract address
 # export HUMAN_NFT_ADDRESS=0xE95515970B457130B5D891666e02ABBA49c84448
 # Human appchain contract addresses
@@ -151,7 +151,7 @@ export PYLON_CHAIN_ID=2139
 
 # Pylon appchain crosschain port - enables cross-chain reads from Celo
 # Modern Pylon chains use the consolidated AppchainPort preinstall at 0x...0043.
-export PYLON_APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
+export APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
 
 # Self Hub contract (official Self contract on Celo)
 export SELF_HUB_ADDRESS=0xe57F4773bd9c9d8b6Cd70431117d353298B9f5BF
@@ -167,7 +167,7 @@ cast block-number --rpc-url $PYLON_RPC_URL
 cast chain-id --rpc-url $PYLON_RPC_URL  # Should return: 2139
 
 # Verify settlement port contract exists
-cast code $PYLON_APPCHAIN_PORT --rpc-url $PYLON_RPC_URL
+cast code $APPCHAIN_PORT --rpc-url $PYLON_RPC_URL
 
 # Verify Pylon is synced with Celo
 curl -s https://pylon.celo-mainnet.spire.dev/_status/ready | jq
@@ -274,7 +274,7 @@ Skip to section 4 if using our existing HumanNFT contract.
 **Important**: This deployment creates both the SettlementForwardingProxy and HumanNFT on Human appchain. The proxy enables cross-chain reads from Celo via Pylon.
 
 ```bash
-export PYLON_APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
+export APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
 export HUMAN_NFT_OWNER=$(cast wallet address --private-key $SIGNER_PRIVATE_KEY)
 
 # Deploy on Human appchain (deploys both SettlementForwardingProxy and HumanNFT)
@@ -307,15 +307,15 @@ echo "   - Settlement proxy on Human appchain: $PROOF_OF_HUMAN_PROXY"
 
 ### 3c. Deterministic Redeploy After Appchain Reset (Recommended)
 
-If the Human appchain chain state is reset (fresh genesis / PVC wipe), you can redeploy `SettlementForwardingProxy` + `HumanNFT` to deterministic addresses using the preinstalled deterministic deployment proxy:
+If the Human appchain chain state is reset (fresh genesis / PVC wipe), you can redeploy `AppchainReadForwarder` + `MigratableHumanNFT` to deterministic addresses using the preinstalled deterministic deployment proxy:
 
 ```bash
-export PYLON_APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
+export APPCHAIN_PORT="0x0000000000000000000000000000000000000043"
 export HUMAN_NFT_OWNER=$(cast wallet address --private-key $SIGNER_PRIVATE_KEY)
 
 pushd contracts
 ./scripts/install-foundry-deps.sh
-forge script script/DeployPylonDeterministic.s.sol:DeployPylonDeterministic \
+forge script script/DeployAppchainDeterministic.s.sol:DeployAppchainDeterministic \
   --rpc-url $PYLON_RPC_URL \
   --broadcast \
   --private-key $SIGNER_PRIVATE_KEY
@@ -499,7 +499,7 @@ cast call $PROOF_OF_HUMAN_ADDRESS \
 1. **Complete attestation on Celo**: Use the frontend to generate and submit proof on Celo before attempting to mint
 2. **Verify network connection**: Ensure your wallet is connected to Human appchain (chain ID 2139)
 3. **Check contract deployment**: Verify SettlementForwardingProxy and HumanNFT are deployed on Human appchain
-4. **Verify cross-chain configuration**: Ensure `PYLON_APPCHAIN_PORT` is set to `0x0000000000000000000000000000000000000043` and ProofOfHuman address is correctly configured in the proxy
+4. **Verify cross-chain configuration**: Ensure `APPCHAIN_PORT` is set to `0x0000000000000000000000000000000000000043` and ProofOfHuman address is correctly configured in the proxy
 
 ### Cross-Chain Read Issues
 

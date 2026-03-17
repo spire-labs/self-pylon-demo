@@ -2,13 +2,13 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {HumanNFT} from "../src/HumanNFT.sol";
+import {MigratableHumanNFT} from "../src/MigratableHumanNFT.sol";
 
 contract HumanNFTMigrationTest is Test {
-    HumanNFT private nft;
+    MigratableHumanNFT private nft;
 
     function setUp() public {
-        nft = new HumanNFT(address(0x1234), address(this));
+        nft = new MigratableHumanNFT(address(0x1234), address(this));
     }
 
     function testSeedMintsSetsStateAndNextId() public {
