@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
-import {HumanNFT} from "../src/HumanNFT.sol";
+import {Script} from "forge-std/Script.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+import {MigratableHumanNFT} from "../src/MigratableHumanNFT.sol";
 
 contract SeedHumanNFT is Script {
     using stdJson for string;
 
     function run() external {
         address nftAddress = vm.envAddress("HUMAN_NFT_ADDRESS");
-        string memory inputPath = vm.envString("SEED_INPUT");
-        string memory json = vm.readFile(inputPath);
+        string memory json = vm.envString("SEED_JSON");
         uint256 batchCount = json.readUint(".batchCount");
         uint256 finalize = vm.envOr("FINALIZE_SEEDING", uint256(0));
         if (finalize == 0) {
@@ -20,7 +19,7 @@ contract SeedHumanNFT is Script {
         uint256 finalizeOnly = vm.envOr("FINALIZE_ONLY", uint256(0));
 
         vm.startBroadcast();
-        HumanNFT nft = HumanNFT(nftAddress);
+        MigratableHumanNFT nft = MigratableHumanNFT(nftAddress);
 
         if (finalizeOnly != 1) {
             for (uint256 i = 0; i < batchCount; i++) {

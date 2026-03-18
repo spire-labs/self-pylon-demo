@@ -9,11 +9,12 @@
     "packages/*"
   ],
   "dependencies": {
-    "@openzeppelin/contracts": "5",
+    "@openzeppelin/contracts": "5.6.1",
     "@self-pylon-demo/abis": "workspace:*",
     "@self-pylon-demo/addresses": "workspace:*",
     "@self-pylon-demo/self-adapter": "workspace:*",
-    "@selfxyz/contracts": "^1.2.0"
+    "@selfxyz/contracts": "^1.2.1",
+    "celo-self-contracts": "git+https://github.com/spire-labs/celo-self-contracts.git#3985267850577e847bac30129083b1dc962e8b41"
   },
   "scripts": {
     "build": "pnpm -r --filter frontend run build",
